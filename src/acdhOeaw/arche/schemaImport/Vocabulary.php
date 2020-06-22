@@ -90,6 +90,7 @@ class Vocabulary {
         $schemaMeta = $this->graph->allOfType(RDF::SKOS_CONCEPT_SCHEMA)[0];
         $schemaMeta->addResource($this->schema->id, $this->url);
         $schemaMeta->addResource($this->schema->id, $schemaMeta->getUri());
+        $schemaMeta->deleteResource(RDF::SKOS_HAS_TOP_CONCEPT); // not to create circular dependency hasTopConcept<->inSchema
         if (null === $schemaMeta->getLiteral($this->schema->label)) {
             $schemaMeta->addLiteral($this->schema->label, new Literal($this->url, 'en'));
         }
