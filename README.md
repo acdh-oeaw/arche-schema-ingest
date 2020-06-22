@@ -2,7 +2,7 @@
 
 Library for ingesting the [ACDH schema](https://github.com/acdh-oeaw/arche-schema) into the [ARCHE repository](https://github.com/acdh-oeaw/arche-core).
 
-## Installation
+## Installation, configuration and usage
 
 * Obtain [composer](https://getcomposer.org/)
 * Run `composer require arche-schema-ingest`
