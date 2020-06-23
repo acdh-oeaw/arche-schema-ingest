@@ -44,4 +44,5 @@ $repo = Repo::factory($argv[1]);
 
 $ontology = new Ontology($cfg->schema);
 $ontology->loadFile($argv[2]);
-$ontology->check($cfg->schema->namespaces->ontology);
+$result   = $ontology->check($cfg->schema->namespaces->ontology);
+exit($result ? 0 : 1);

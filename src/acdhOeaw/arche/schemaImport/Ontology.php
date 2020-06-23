@@ -96,7 +96,7 @@ class Ontology {
         $result = true;
         foreach ($this->ontology->allOfType(RDF::OWL_RESTRICTION) as $i) {
             $restriction = new Restriction($i, $this->schema);
-            $result      &= $restriction->check(true);
+            $result      &= $restriction->check(true) ?? true;
         }
         foreach ($this->ontology->allOfType(RDF::OWL_DATATYPE_PROPERTY) as $i) {
             if (!empty($propNmsp) && substr($i->getUri(), 0, $n) === $propNmsp) {
