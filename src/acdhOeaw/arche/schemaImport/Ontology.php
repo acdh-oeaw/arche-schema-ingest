@@ -80,7 +80,7 @@ class Ontology {
         $searchTerm              = new SearchTerm($this->schema->parent, '', '=', SearchTerm::TYPE_RELATION);
         $searchCfg               = new SearchConfig();
         $searchCfg->metadataMode = RepoResource::META_RESOURCE;
-        foreach (self::collections as $i) {
+        foreach (self::$collections as $i) {
             $searchTerm->value = $i;
             $children          = $repo->getResourcesBySearchTerms([$searchTerm], $searchCfg);
             foreach ($children as $j) {
