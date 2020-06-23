@@ -137,9 +137,9 @@ class Ontology {
                         $property->check($verbose);
                         break;
                 }
-            }
-            if ($import) {
-                $this->saveOrUpdate($repo, $i, $type, $imported, $verbose);
+                if ($import) {
+                    $this->saveOrUpdate($repo, $i, $type, $imported, $verbose);
+                }
             }
         }
 
