@@ -46,6 +46,14 @@ use zozlak\RdfConstants as RDF;
  */
 class Ontology {
 
+    // restrictions go first as checkRestriction() can affect the whole graph
+    static private $collections = [
+        RDF::OWL_RESTRICTION,
+        RDF::OWL_CLASS,
+        RDF::OWL_OBJECT_PROPERTY,
+        RDF::OWL_DATATYPE_PROPERTY,
+    ];
+
     /**
      *
      * @var \EasyRdf\Graph
@@ -68,37 +76,47 @@ class Ontology {
     }
 
     public function loadRepo(Repo $repo): void {
-        $this->ontology = new Graph();        
-        $collections             = [
-            RDF::OWL_RESTRICTION,
-            RDF::OWL_CLASS,
-            RDF::OWL_OBJECT_PROPERTY,
-            RDF::OWL_DATATYPE_PROPERTY,
-        ];
+        $this->ontology          = new Graph();
         $searchTerm              = new SearchTerm($this->schema->parent, '', '=', SearchTerm::TYPE_RELATION);
         $searchCfg               = new SearchConfig();
         $searchCfg->metadataMode = RepoResource::META_RESOURCE;
-        foreach ($collections as $i) {
+        foreach (self::collections as $i) {
             $searchTerm->value = $i;
             $children          = $repo->getResourcesBySearchTerms([$searchTerm], $searchCfg);
-            foreach($children as $j) {
+            foreach ($children as $j) {
                 /* @var $j RepoResource */
                 $j->getGraph()->copy([], '/^$/', '', $this->ontology);
             }
         }
     }
 
-    public function import(Repo $repo, bool $verbose = false): void {
-        // restrictions go first as checkRestriction() can affect the whole graph
-        $collections = [
-            $this->schema->namespaces->ontology . 'ontology',
-            RDF::OWL_RESTRICTION,
-            RDF::OWL_CLASS,
-            RDF::OWL_OBJECT_PROPERTY,
-            RDF::OWL_DATATYPE_PROPERTY,
-        ];
+    public function check(string $propNmsp = ''): bool {
+        $n = strlen($propNmsp);
 
+        $result = true;
+        foreach ($this->ontology->allOfType(RDF::OWL_RESTRICTION) as $i) {
+            $restriction = new Restriction($i, $this->schema);
+            $result      &= $restriction->check(true);
+        }
+        foreach ($this->ontology->allOfType(RDF::OWL_DATATYPE_PROPERTY) as $i) {
+            if (!empty($propNmsp) && substr($i->getUri(), 0, $n) === $propNmsp) {
+                $property = new Property($i, $this->schema);
+                $result   &= $property->check(true);
+            }
+        }
+        foreach ($this->ontology->allOfType(RDF::OWL_OBJECT_PROPERTY) as $i) {
+            if (!empty($propNmsp) && substr($i->getUri(), 0, $n) === $propNmsp) {
+                $property = new Property($i, $this->schema);
+                $result   &= $property->check(true);
+            }
+        }
+        return $result;
+    }
+
+    public function import(Repo $repo, bool $verbose = false): void {
         echo $verbose ? "### Creating top-level collections\n" : '';
+
+        $collections = array_merge([$this->schema->namespaces->ontology . 'ontology'], self::$collections);
         foreach ($collections as $i => $id) {
             $this->createCollection($repo, $id);
         }
@@ -108,13 +126,20 @@ class Ontology {
             echo $verbose ? "### Importing $type\n" : '';
             foreach ($this->ontology->allOfType($type) as $i) {
                 $import = true;
-                if ($type === RDF::OWL_RESTRICTION) {
-                    $restriction = new Restriction($i, $this->schema);
-                    $import      = $restriction->check($verbose);
+                switch ($type) {
+                    case RDF::OWL_RESTRICTION:
+                        $restriction = new Restriction($i, $this->schema);
+                        $import      = $restriction->check($verbose);
+                        break;
+                    case RDF::OWL_OBJECT_PROPERT:
+                    case RDF::OWL_DATATYPE_PROPERTY:
+                        $property    = new Property($i, $this->schema);
+                        $property->check($verbose);
+                        break;
                 }
-                if ($import) {
-                    $this->saveOrUpdate($repo, $i, $type, $imported, $verbose);
-                }
+            }
+            if ($import) {
+                $this->saveOrUpdate($repo, $i, $type, $imported, $verbose);
             }
         }
 
@@ -194,12 +219,12 @@ class Ontology {
                 $vocabularyUrl = (string) $vocabularyUrl;
                 echo $verbose ? "$vocabularyUrl\n" : '';
                 $vocabulary    = new Vocabulary($this->schema);
-                $vocabulary->loadUrl($vocabularyUrl);
                 try {
-                    $vocabulary->update($repo, $verbose);
+                    $vocabulary->loadUrl($vocabularyUrl);
                 } catch (RequestException $e) {
                     echo $verbose ? "    fetch error" . $e->getMessage() . "\n" : '';
                 }
+                $vocabulary->update($repo, $verbose);
             }
         }
     }
