@@ -131,7 +131,7 @@ class Ontology {
                         $restriction = new Restriction($i, $this->schema);
                         $import      = $restriction->check($verbose);
                         break;
-                    case RDF::OWL_OBJECT_PROPERT:
+                    case RDF::OWL_OBJECT_PROPERTY:
                     case RDF::OWL_DATATYPE_PROPERTY:
                         $property    = new Property($i, $this->schema);
                         $property->check($verbose);
