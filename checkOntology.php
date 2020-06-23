@@ -40,8 +40,6 @@ if (isset($cfg->composerLocation)) {
     require_once __DIR__ . '/vendor/autoload.php';
 }
 
-$repo = Repo::factory($argv[1]);
-
 $ontology = new Ontology($cfg->schema);
 $ontology->loadFile($argv[2]);
 $result   = $ontology->check($cfg->schema->namespaces->ontology);
