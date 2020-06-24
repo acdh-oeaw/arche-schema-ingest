@@ -29,7 +29,6 @@ namespace acdhOeaw\arche\schemaImport;
 use EasyRdf\Graph;
 use EasyRdf\Literal;
 use EasyRdf\Resource;
-use EasyRdf\RdfNamespace;
 use GuzzleHttp\Exception\RequestException;
 use acdhOeaw\acdhRepoLib\BinaryPayload;
 use acdhOeaw\acdhRepoLib\Repo;
@@ -66,15 +65,29 @@ class Ontology {
      */
     private $schema;
 
+    /**
+     * 
+     * @param object $schema
+     */
     public function __construct(object $schema) {
         $this->schema = $schema;
     }
 
+    /**
+     * 
+     * @param string $filename
+     * @return void
+     */
     public function loadFile(string $filename): void {
         $this->ontology = new Graph();
         $this->ontology->parseFile($filename);
     }
 
+    /**
+     * 
+     * @param Repo $repo
+     * @return void
+     */
     public function loadRepo(Repo $repo): void {
         $this->ontology          = new Graph();
         $searchTerm              = new SearchTerm($this->schema->parent, '', '=', SearchTerm::TYPE_RELATION);
@@ -90,6 +103,11 @@ class Ontology {
         }
     }
 
+    /**
+     * 
+     * @param string $propNmsp
+     * @return bool
+     */
     public function check(string $propNmsp = ''): bool {
         $n = strlen($propNmsp);
 
@@ -113,6 +131,12 @@ class Ontology {
         return $result;
     }
 
+    /**
+     * 
+     * @param Repo $repo
+     * @param bool $verbose
+     * @return void
+     */
     public function import(Repo $repo, bool $verbose = false): void {
         echo $verbose ? "### Creating top-level collections\n" : '';
 
@@ -121,15 +145,18 @@ class Ontology {
             $this->createCollection($repo, $id);
         }
 
+        $ids      = [];
         $imported = [];
         foreach ($collections as $type) {
             echo $verbose ? "### Importing $type\n" : '';
             foreach ($this->ontology->allOfType($type) as $i) {
                 $import = true;
+                $id     = (string) $i->getUri();
                 switch ($type) {
                     case RDF::OWL_RESTRICTION:
                         $restriction = new Restriction($i, $this->schema);
                         $import      = $restriction->check($verbose);
+                        $id          = $restriction->generateId(); // restrictions in owl are anonymous, we need to create ids for them on our own
                         break;
                     case RDF::OWL_OBJECT_PROPERTY:
                     case RDF::OWL_DATATYPE_PROPERTY:
@@ -137,8 +164,19 @@ class Ontology {
                         $property->check($verbose);
                         break;
                 }
-                if ($import) {
-                    $this->saveOrUpdate($repo, $i, $type, $imported, $verbose);
+                if (preg_match('/^_:genid[0-9]+$/', $id)) {
+                    echo $verbose ? "Skipping an anonymous resource \n" . $i->dump('text') : '';
+                    $import = false;
+                }
+                if (in_array($id, $ids)) {
+                    echo $verbose ? "Skipping a duplicated resource \n" . $i->dump('text') : '';
+                    $import = false;
+                }
+                $ids[] = $id;
+                if ($import === true) {
+                    $meta       = $this->sanitizeOwlObject($i, $id, $type);
+                    $repoRes    = Util::updateOrCreate($repo, $id, $meta, $verbose);
+                    $imported[] = $repoRes->getUri();
                 }
             }
         }
@@ -150,6 +188,14 @@ class Ontology {
         }
     }
 
+    /**
+     * 
+     * @param Repo $repo
+     * @param string $owlPath
+     * @param bool $verbose
+     * @return void
+     * @throws Exception
+     */
     public function importOwlFile(Repo $repo, string $owlPath, bool $verbose): void {
         $s = $this->schema;
 
@@ -210,6 +256,12 @@ class Ontology {
         }
     }
 
+    /**
+     * 
+     * @param Repo $repo
+     * @param bool $verbose
+     * @return void
+     */
     public function importVocabularies(Repo $repo, bool $verbose): void {
         echo $verbose ? "###  Importing external vocabularies\n" : '';
 
@@ -229,6 +281,12 @@ class Ontology {
         }
     }
 
+    /**
+     * 
+     * @param Repo $repo
+     * @param type $id
+     * @return void
+     */
     private function createCollection(Repo $repo, $id): void {
         try {
             $res = $repo->getResourceById($id);
@@ -241,62 +299,38 @@ class Ontology {
     }
 
     /**
-     * Imports or updates (if it already exists) a given owl object 
-     * (class/dataProperty/objectProperty/restriction) into the repository
-     * @param \acdhOeaw\acdhRepoLib\Repo $repo repository connection object
+     * Prepares an RDF resource representing an OWL object
+     * (class/dataProperty/objectProperty/restriction) for repository import.
+     * 
      * @param \EasyRdf\Resource $res an owl object to be imported/updated
-     * @param string $parentId collection in which a repository repository resource should be created
-     * @param array $imported an array of created/updated resources (will be extended with a
-     *   resource corresponding to the $res upon a successful creation/update)
-     * @param bool $verbose
+     * @param string $id desired owl object identifier (may differ from $res URI
+     * @param string $parentId collection in which a repository repository 
+     *   resource should be created
+     * @return string URL of a created/updated repository resource
      */
-    function saveOrUpdate(Repo $repo, Resource $res, string $parentId,
-                          array &$imported, bool $verbose) {
-        static $ids = [];
-        $schema     = $repo->getSchema();
-
-        if ($res->isA(RDF::OWL_RESTRICTION)) {
-            // restrictions in owl are anonymous, we need to create ids for them automatically
-            $id = (new Restriction($res, $schema))->generateId();
-        } else {
-            $id = RdfNamespace::expand($res->getUri());
-            if (preg_match('/^_:genid[0-9]+$/', $id)) {
-                echo $verbose ? "Skipping an anonymous resource \n" . $res->dump('text') : '';
-                return;
-            }
-        }
-
-        if (in_array($id, $ids)) {
-            echo $verbose ? "Skipping a duplicated resource \n" . $res->dump('text') : '';
-            return;
-        }
-        $ids[] = $id;
-
+    function sanitizeOwlObject(Resource $res, string $id, string $parentId): Resource {
         $meta = (new Graph())->resource('.');
-
-        foreach ($res->properties() as $p) {
+        foreach ($res->propertyUris() as $p) {
             foreach ($res->allLiterals($p) as $v) {
                 if ($v->getValue() !== '') {
                     $meta->addLiteral($p, $v->getValue(), $v->getLang() ?? 'en');
                 }
             }
             foreach ($res->allResources($p) as $v) {
-                if ($v->isBNode()) {
-                    continue;
+                if (!$v->isBNode()) {
+                    $meta->addResource($p, $v);
                 }
-                $meta->addResource($p, $v);
             }
         }
 
-        $meta->addResource($schema->id, $id);
-        $meta->addResource($schema->parent, $parentId);
+        $meta->addResource($this->schema->id, $id);
+        $meta->addResource($this->schema->parent, $parentId);
 
-        if (null === $meta->getLiteral($schema->label)) {
-            $meta->addLiteral($schema->label, preg_replace('|^.*[/#]|', '', $id), 'en');
+        if (null === $meta->getLiteral($this->schema->label)) {
+            $meta->addLiteral($this->schema->label, preg_replace('|^.*[/#]|', '', $id), 'en');
         }
 
-        $repoRes    = Util::updateOrCreate($repo, $id, $meta, $verbose);
-        $imported[] = $repoRes->getUri();
+        return $meta;
     }
 
 }
