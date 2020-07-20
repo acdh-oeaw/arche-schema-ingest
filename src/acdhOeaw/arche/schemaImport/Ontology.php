@@ -156,7 +156,7 @@ class Ontology {
                     case RDF::OWL_RESTRICTION:
                         $restriction = new Restriction($i, $this->schema);
                         $import      = $restriction->check($verbose);
-                        $id          = $restriction->generateId(); // restrictions in owl are anonymous, we need to create ids for them on our own
+                        $id          = $restriction->getId(); // restrictions in owl are anonymous, we need to create ids for them on our own
                         break;
                     case RDF::OWL_OBJECT_PROPERTY:
                     case RDF::OWL_DATATYPE_PROPERTY:

@@ -48,9 +48,16 @@ class Restriction {
      */
     private $schema;
 
+    /**
+     *
+     * @var string
+     */
+    private $id;
+    
     public function __construct(Resource $res, object $schema) {
         $this->res    = $res;
         $this->schema = $schema;
+        $this->id     = $this->schema->namespaces->ontology . 'restriction-' . microtime(true);
     }
 
     /**
@@ -100,19 +107,17 @@ class Restriction {
             return false;
         }
 
-        $id = $this->generateId();
-
         // fix class inheritance
         foreach ($children as $i) {
             $i->deleteResource(RDF::RDFS_SUB_CLASS_OF, $this->res);
-            $i->addResource(RDF::RDFS_SUB_CLASS_OF, $id);
+            $i->addResource(RDF::RDFS_SUB_CLASS_OF, $this->id);
         }
 
         return true;
     }
 
-    public function generateId(): string {
-        return $this->schema->namespaces->ontology . 'restriction-' . microtime(true);
+    public function getId(): string {
+        return $this->id;
     }
 
 }
