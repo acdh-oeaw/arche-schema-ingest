@@ -96,18 +96,8 @@ class Restriction {
 
         $simplify = count($this->res->allResources(RDF::OWL_ON_CLASS)) + count($this->res->allResources(RDF::OWL_ON_DATA_RANGE));
         if ($simplify) {
-            echo $verbose ? "simplifying " . $this->res->getUri() . "\n" : '';
-            $this->res->deleteResource(RDF::OWL_ON_CLASS);
-            $this->res->deleteResource(RDF::OWL_ON_DATA_RANGE);
-            $qCard = [RDF::OWL_QUALIFIED_CARDINALITY, RDF::OWL_MIN_QUALIFIED_CARDINALITY,
-                RDF::OWL_MAX_QUALIFIED_CARDINALITY];
-            foreach ($qCard as $srcProp) {
-                $targetProp = str_replace('qualifiedC', 'c', str_replace('Qualified', '', $srcProp));
-                foreach ($this->res->allLiterals($srcProp) as $j) {
-                    $this->res->addLiteral($targetProp, $j->getValue());
-                }
-                $this->res->delete($srcProp);
-            }
+            echo $verbose ? "restriction " . $this->res->getUri() . " for class " . $i->getUri() . " and property " . $prop->getUri() . " is a qualified one\n" : '';
+            return false;
         }
 
         $id = $this->generateId();
