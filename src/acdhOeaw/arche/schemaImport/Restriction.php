@@ -57,8 +57,6 @@ class Restriction {
      * Checks if a given restriction is consistent with the rest of the ontology
      */
     public function check(bool $verbose): ?bool {
-        static $values = [];
-
         // there must be at least one class connected with the restriction 
         // (which in owl terms means there must be at least one class inheriting from the restriction)
         $children = $this->res->getGraph()->resourcesMatching(RDF::RDFS_SUB_CLASS_OF, $this->res);
@@ -84,34 +82,20 @@ class Restriction {
         }
 
         // classes inheriting from the restriction must match or inherit from restriction's property domain
+        // violation example:
+        //   A isSubclassOf R [A has restriction R]
+        //   R onProperty P
+        //   P domain B
+        //   A is not subclassOf B
         foreach ($children as $i) {
             if (!Util::doesInherit($i, $propDomain)) {
-                echo $verbose ? $this->res->getUri() . " - owl:onClass (" . $i->getUri() . ") doesn't inherit from owl:onProperty/rdfs:domain (" . $propDomain->getUri() . ")\n" : '';
+                echo $verbose ? "restriction for class " . $i->getUri() . " and property " . $prop->getUri() . " - the class is not a subclass of property's domain (".$propDomain->getUri().")\n" : '';
                 return false;
             }
         }
 
-        // target classes of qualified restrictions must match or inherit from restriction's property range
-        $rangeMatch = 0;
-        $onClass    = $this->res->allResources(RDF::OWL_ON_CLASS);
-        foreach ($onClass as $i) {
-            if (!Util::doesInherit($i, $propRange)) {
-                echo $verbose ? $this->res->getUri() . " - owl:onClass (" . $i->getUri() . ") doesn't inherit from owl:onProperty/rdfs:range (" . $propRange->getUri() . ")\n" : '';
-                return false;
-            }
-            $rangeMatch += $i === $propRange;
-        }
-        $onDataRange = $this->res->allResources(RDF::OWL_ON_DATA_RANGE);
-        foreach ($onDataRange as $i) {
-            if (!Util::doesInherit($i, $propRange)) {
-                echo $verbose ? $this->res->getUri() . " - owl:onDataRange (" . $i->getUri() . ") doesn't inherit from owl:onProperty/rdfs:range (" . $propRange->getUri() . ")\n" : '';
-                return false;
-            }
-            $rangeMatch += $i === $propRange;
-        }
-
-        // simplify qualified restrictions which qualified rules don't differ from restriction's property range
-        if (count($onClass) + count($onDataRange) === $rangeMatch && $rangeMatch > 0) {
+        $simplify = count($this->res->allResources(RDF::OWL_ON_CLASS)) + count($this->res->allResources(RDF::OWL_ON_DATA_RANGE));
+        if ($simplify) {
             echo $verbose ? "simplifying " . $this->res->getUri() . "\n" : '';
             $this->res->deleteResource(RDF::OWL_ON_CLASS);
             $this->res->deleteResource(RDF::OWL_ON_DATA_RANGE);
@@ -126,13 +110,6 @@ class Restriction {
             }
         }
 
-        // minQualifiedCardinality equal to 0 provides no information
-        // (evaluated after simplification)
-        if (count($this->res->allLiterals(RDF::OWL_MIN_QUALIFIED_CARDINALITY, 0)) > 0) {
-            echo $verbose ? $this->res->getUri() . " - owl:minQualifiedCardinality = 0 which doesn't provide any useful information\n" : '';
-            return false;
-        }
-
         $id = $this->generateId();
 
         // fix class inheritance
@@ -141,40 +118,11 @@ class Restriction {
             $i->addResource(RDF::RDFS_SUB_CLASS_OF, $id);
         }
 
-        // if restriction is duplicated there is no need to import it
-        if (isset($values[$id])) {
-            echo $verbose ? $this->res->getUri() . " - duplicated restriction (but no actions needed)\n" : '';
-            return null;
-        }
-        $values[$id] = '';
-
         return true;
     }
 
     public function generateId(): string {
-        $idProps = [];
-        foreach ($this->res->allResources(RDF::OWL_ON_PROPERTY) as $i) {
-            $idProps[] = $i->getUri();
-        }
-        foreach ($this->res->allResources(RDF::OWL_ON_DATA_RANGE) as $i) {
-            $idProps[] = $i->getUri();
-        }
-        foreach ($this->res->allResources(RDF::OWL_ON_CLASS) as $i) {
-            $idProps[] = $i->getUri();
-        }
-        $cardProps = [RDF::OWL_QUALIFIED_CARDINALITY, RDF::OWL_MIN_QUALIFIED_CARDINALITY,
-            RDF::OWL_MAX_QUALIFIED_CARDINALITY, RDF::OWL_CARDINALITY, RDF::OWL_MIN_CARDINALITY,
-            RDF::OWL_MAX_CARDINALITY];
-        foreach ($cardProps as $p) {
-            $tmp = $this->res->getLiteral($p);
-            if ($tmp !== null) {
-                $idProps[] = $p . $tmp->getValue();
-            }
-        }
-
-        $idProps = array_unique($idProps);
-        sort($idProps);
-        return $this->schema->namespaces->ontology . 'restriction-' . md5(implode(',', $idProps));
+        return $this->schema->namespaces->ontology . 'restriction-' . microtime(true);
     }
 
 }

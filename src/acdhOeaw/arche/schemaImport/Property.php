@@ -43,6 +43,7 @@ class Property {
         RDF::XSD_NEGATIVE_INTEGER, RDF::XSD_POSITIVE_INTEGER,
         RDF::XSD_NON_NEGATIVE_INTEGER, RDF::XSD_NON_POSITIVE_INTEGER,
         RDF::XSD_STRING,
+        RDF::XSD_ANY_URI,
     ];
 
     /**
@@ -74,8 +75,8 @@ class Property {
             $result = false;
         } else {
 
-            if (!empty($this->res->get($this->schema->ontology->vocabs)) && $range !== RDF::XSD_ANY_URI) {
-                echo $verbose ? $this->res->getUri() . " - uses vocabulary but its range $range is not xsd:anyURI\n" : '';
+            if ($this->res->isA(RDF::OWL_DATATYPE_PROPERTY) && !empty($this->res->get($this->schema->ontology->vocabs))) {
+                echo $verbose ? $this->res->getUri() . " - is a DatatypeProperty with a vocabulary\n" : '';
                 $result = false;
             }
 
