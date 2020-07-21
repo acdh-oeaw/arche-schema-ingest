@@ -35,7 +35,7 @@ use zozlak\RdfConstants as RDF;
  * @author zozlak
  */
 class Property {
-
+    
     static private $literalTypes = [
         RDF::XSD_BOOLEAN,
         RDF::XSD_DATE, RDF::XSD_TIME, RDF::XSD_DATE_TIME, RDF::XSD_DURATION,
@@ -74,12 +74,6 @@ class Property {
             echo $verbose ? $this->res->getUri() . " - has an empty range\n" : '';
             $result = false;
         } else {
-
-            if ($this->res->isA(RDF::OWL_DATATYPE_PROPERTY) && !empty($this->res->get($this->schema->ontology->vocabs))) {
-                echo $verbose ? $this->res->getUri() . " - is a DatatypeProperty with a vocabulary\n" : '';
-                $result = false;
-            }
-
             if (!empty($this->res->get($this->schema->ontology->langTag)) && $range !== RDF::XSD_STRING) {
                 echo $verbose ? $this->res->getUri() . " - requires a language tag but its range $range is not xsd:string\n" : '';
                 $result = false;
@@ -98,7 +92,17 @@ class Property {
                 $result = false;
             }
         }
-        
+
+        if ($this->res->isA(RDF::OWL_DATATYPE_PROPERTY) && !empty($this->res->get($this->schema->ontology->vocabs))) {
+            echo $verbose ? $this->res->getUri() . " - is a DatatypeProperty with a vocabulary\n" : '';
+            $result = false;
+        }
+
+        if (count($this->res->allLiterals($this->schema->ontology->recommended)) > 0) {
+            echo $verbose ? $this->res->getUri() . " - has a recommended annotation with a literal value\n" : '';
+            return false;
+        }
+
         return $result;
     }
 

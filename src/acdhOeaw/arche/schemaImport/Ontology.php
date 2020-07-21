@@ -47,6 +47,7 @@ class Ontology {
 
     // restrictions go first as checkRestriction() can affect the whole graph
     static private $collections = [
+        RDF::OWL_ANNOTATION_PROPERTY,
         RDF::OWL_RESTRICTION,
         RDF::OWL_CLASS,
         RDF::OWL_OBJECT_PROPERTY,
