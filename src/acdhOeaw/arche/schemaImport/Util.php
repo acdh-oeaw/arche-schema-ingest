@@ -79,7 +79,7 @@ class Util {
      * Checks if $what inherits from $from
      */
     static public function doesInherit(Resource $what, Resource $from): bool {
-        if ($what === $from) {
+        if ($what === $from || in_array((string) $from, [RDF::OWL_THING, RDF::RDFS_LITERAL])) {
             return true;
         }
         $flag = false;

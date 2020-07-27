@@ -26,7 +26,6 @@
 
 namespace acdhOeaw\arche\schemaImport;
 
-use EasyRdf\Resource;
 use zozlak\RdfConstants as RDF;
 
 /**
@@ -34,36 +33,25 @@ use zozlak\RdfConstants as RDF;
  *
  * @author zozlak
  */
-class Restriction {
-
-    /**
-     *
-     * @var EasyRdf\Resource
-     */
-    private $res;
-
-    /**
-     *
-     * @var object
-     */
-    private $schema;
+class Restriction extends Entity {
 
     /**
      *
      * @var string
      */
     private $id;
-    
-    public function __construct(Resource $res, object $schema) {
-        $this->res    = $res;
-        $this->schema = $schema;
-        $this->id     = $this->schema->namespaces->ontology . 'restriction-' . microtime(true);
+
+    public function __construct(\EasyRdf\Resource $res, object $schema) {
+        parent::__construct($res, $schema);
+        $this->id = $this->schema->namespaces->ontology . 'restriction-' . microtime(true);
     }
 
     /**
      * Checks if a given restriction is consistent with the rest of the ontology
      */
     public function check(bool $verbose): ?bool {
+        $base = $this->schema->namespaces->ontology;
+
         // there must be at least one class connected with the restriction 
         // (which in owl terms means there must be at least one class inheriting from the restriction)
         $children = $this->res->getGraph()->resourcesMatching(RDF::RDFS_SUB_CLASS_OF, $this->res);
@@ -96,7 +84,7 @@ class Restriction {
         //   A is not subclassOf B
         foreach ($children as $i) {
             if (!Util::doesInherit($i, $propDomain)) {
-                echo $verbose ? "restriction for class " . $i->getUri() . " and property " . $prop->getUri() . " - the class is not a subclass of property's domain (".$propDomain->getUri().")\n" : '';
+                echo $verbose ? "restriction for class " . $i->getUri() . " and property " . $prop->getUri() . " - the class is not a subclass of property's domain (" . $propDomain->getUri() . ")\n" : '';
                 return false;
             }
         }
@@ -104,6 +92,32 @@ class Restriction {
         $simplify = count($this->res->allResources(RDF::OWL_ON_CLASS)) + count($this->res->allResources(RDF::OWL_ON_DATA_RANGE));
         if ($simplify) {
             echo $verbose ? "restriction " . $this->res->getUri() . " for class " . $i->getUri() . " and property " . $prop->getUri() . " is a qualified one\n" : '';
+            return false;
+        }
+
+        $min       = (string) $this->res->getLiteral(RDF::OWL_MIN_CARDINALITY);
+        $max       = (string) $this->res->getLiteral(RDF::OWL_MAX_CARDINALITY);
+        $exact     = (string) $this->res->getLiteral(RDF::OWL_CARDINALITY);
+        $default   = (string) $this->res->getResource(RDF::OWL_ON_PROPERTY)->getLiteral($base . 'defaultValue');
+        $automated = (string) $this->res->getResource(RDF::OWL_ON_PROPERTY)->getLiteral($base . 'automatedFill');
+        if (!empty($exact) && $exact !== '1') {
+            echo $verbose ? "restriction " . $this->res->getUri() . " for class " . $i->getUri() . " and property " . $prop->getUri() . " has cardinality $exact while the only supported value is 1\n" : '';
+            return false;
+        }
+        if (!empty($max) && $max !== '1') {
+            echo $verbose ? "restriction " . $this->res->getUri() . " for class " . $i->getUri() . " and property " . $prop->getUri() . " has max cardinality $max while the only supported value is 1\n" : '';
+            return false;
+        }
+        if (!empty($min) && (int) $min > 1) {
+            echo $verbose ? "restriction " . $this->res->getUri() . " for class " . $i->getUri() . " and property " . $prop->getUri() . " has min cardinality $max while the maximum supported value is 1\n" : '';
+            return false;
+        }
+        if (!empty($default) && ($min === '1' || $exact === '1')) {
+            echo $verbose ? "restriction " . $this->res->getUri() . " for class " . $i->getUri() . " and property " . $prop->getUri() . " has min cardinality $min$exact which means its default value of $default will be never used\n" : '';
+            return false;
+        }
+        if (!empty($min . $max . $exact) && !empty($automated)) {
+            echo $verbose ? "restriction " . $this->res->getUri() . " for class " . $i->getUri() . " and property " . $prop->getUri() . " is not needed as the property is marked as automatically managed one\n" : '';
             return false;
         }
 

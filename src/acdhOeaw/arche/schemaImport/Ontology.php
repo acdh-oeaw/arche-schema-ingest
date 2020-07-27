@@ -82,6 +82,7 @@ class Ontology {
     public function loadFile(string $filename): void {
         $this->ontology = new Graph();
         $this->ontology->parseFile($filename);
+        $this->ontology->resource(RDF::OWL_THING)->addResource(RDF::RDF_TYPE, RDF::OWL_CLASS);
     }
 
     /**
@@ -151,20 +152,23 @@ class Ontology {
         foreach ($collections as $type) {
             echo $verbose ? "### Importing $type\n" : '';
             foreach ($this->ontology->allOfType($type) as $i) {
-                $import = true;
-                $id     = (string) $i->getUri();
                 switch ($type) {
                     case RDF::OWL_RESTRICTION:
-                        $restriction = new Restriction($i, $this->schema);
-                        $import      = $restriction->check($verbose);
-                        $id          = $restriction->getId(); // restrictions in owl are anonymous, we need to create ids for them on our own
+                        $entity = new Restriction($i, $this->schema);
                         break;
                     case RDF::OWL_OBJECT_PROPERTY:
                     case RDF::OWL_DATATYPE_PROPERTY:
-                        $property    = new Property($i, $this->schema);
-                        $property->check($verbose);
+                        $entity = new Property($i, $this->schema);
+                        break;
+                    case RDF::OWL_CLASS:
+                        $entity = new RdfClass($i, $this->schema);
+                        break;
+                    default:
+                        $entity = new Entity($i, $this->schema);
                         break;
                 }
+                $import = $entity->check($verbose); // the check method may alter the $i RDF resource
+                $id     = $entity->getId();
                 if (preg_match('/^_:genid[0-9]+$/', $id)) {
                     echo $verbose ? "Skipping an anonymous resource \n" . $i->dump('text') : '';
                     $import = false;

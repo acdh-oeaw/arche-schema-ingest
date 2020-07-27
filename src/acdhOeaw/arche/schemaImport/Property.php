@@ -26,7 +26,6 @@
 
 namespace acdhOeaw\arche\schemaImport;
 
-use EasyRdf\Resource;
 use zozlak\RdfConstants as RDF;
 
 /**
@@ -34,8 +33,8 @@ use zozlak\RdfConstants as RDF;
  *
  * @author zozlak
  */
-class Property {
-    
+class Property extends Entity {
+
     static private $literalTypes = [
         RDF::XSD_BOOLEAN,
         RDF::XSD_DATE, RDF::XSD_TIME, RDF::XSD_DATE_TIME, RDF::XSD_DURATION,
@@ -47,26 +46,10 @@ class Property {
     ];
 
     /**
-     *
-     * @var EasyRdf\Resource
-     */
-    private $res;
-
-    /**
-     *
-     * @var object
-     */
-    private $schema;
-
-    public function __construct(Resource $res, object $schema) {
-        $this->res    = $res;
-        $this->schema = $schema;
-    }
-
-    /**
      * Checks if a given property definition is valid
      */
-    public function check(bool $verbose): bool {
+    public function check(bool $verbose): ?bool {
+        $base   = $this->schema->namespaces->ontology;
         $result = true;
         $range  = (string) $this->res->getResource(RDF::RDFS_RANGE);
 
@@ -74,11 +57,11 @@ class Property {
             echo $verbose ? $this->res->getUri() . " - has an empty range\n" : '';
             $result = false;
         } else {
-            if (!empty($this->res->get($this->schema->ontology->langTag)) && $range !== RDF::XSD_STRING) {
+            if (!empty($this->res->get($base . 'langTag')) && $range !== RDF::XSD_STRING) {
                 echo $verbose ? $this->res->getUri() . " - requires a language tag but its range $range is not xsd:string\n" : '';
                 $result = false;
             }
-            if (!empty($this->res->get($this->schema->ontology->langTag)) && !$this->res->isA(RDF::OWL_DATATYPE_PROPERTY)) {
+            if (!empty($this->res->get($base . 'langTag')) && !$this->res->isA(RDF::OWL_DATATYPE_PROPERTY)) {
                 echo $verbose ? $this->res->getUri() . " - requires a language tag but it's not a DatatypeProperty\n" : '';
                 $result = false;
             }
@@ -93,12 +76,12 @@ class Property {
             }
         }
 
-        if ($this->res->isA(RDF::OWL_DATATYPE_PROPERTY) && !empty($this->res->get($this->schema->ontology->vocabs))) {
+        if ($this->res->isA(RDF::OWL_DATATYPE_PROPERTY) && !empty($this->res->get($base . 'vocabs'))) {
             echo $verbose ? $this->res->getUri() . " - is a DatatypeProperty with a vocabulary\n" : '';
             $result = false;
         }
 
-        if (count($this->res->allLiterals($this->schema->ontology->recommended)) > 0) {
+        if (count($this->res->allLiterals($base . 'recommendedClass')) > 0) {
             echo $verbose ? $this->res->getUri() . " - has a recommended annotation with a literal value\n" : '';
             return false;
         }
