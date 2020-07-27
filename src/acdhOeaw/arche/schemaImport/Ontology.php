@@ -188,7 +188,7 @@ class Ontology {
 
         echo $verbose ? "### Removing obsolete resources...\n" : '';
         array_shift($collections);
-        foreach ($collections as $id) {
+        foreach (self::$collections as $id) {
             Util::removeObsoleteChildren($repo, $id, $this->schema->parent, $imported, $verbose);
         }
     }
