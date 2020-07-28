@@ -280,15 +280,15 @@ class Ontology {
                 $vocabulary    = new Vocabulary($this->schema);
                 try {
                     $vocabulary->loadUrl($vocabularyUrl);
+                    if ($manageTransactions) {
+                        $repo->begin();
+                    }
+                    $vocabulary->update($repo, $verbose);
+                    if ($manageTransactions) {
+                        $repo->commit();
+                    }
                 } catch (RequestException $e) {
                     echo $verbose ? "    fetch error" . $e->getMessage() . "\n" : '';
-                }
-                if ($manageTransactions) {
-                    $repo->begin();
-                }
-                $vocabulary->update($repo, $verbose);
-                if ($manageTransactions) {
-                    $repo->commit();
                 }
             }
         }
