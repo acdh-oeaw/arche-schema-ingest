@@ -52,10 +52,10 @@ try {
     if (!in_array('--skipBinary', $argv)) {
         $ontology->importOwlFile($repo, $argv[2], true);
     }
-    if (!in_array('--skipVocabularies', $argv)) {
-        $ontology->importVocabularies($repo, true);
-    }
     $repo->commit();
+    if (!in_array('--skipVocabularies', $argv)) {
+        $ontology->importVocabularies($repo, true, true);
+    }
 } finally {
     if ($repo->inTransaction()) {
         $repo->rollback();

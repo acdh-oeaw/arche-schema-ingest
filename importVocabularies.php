@@ -52,9 +52,7 @@ if ($argc > 2) {
 }
 
 try {
-    $repo->begin();
-    $ontology->importVocabularies($repo, true);
-    $repo->commit();
+    $ontology->importVocabularies($repo, true, true);
 } finally {
     if ($repo->inTransaction()) {
         $repo->rollback();

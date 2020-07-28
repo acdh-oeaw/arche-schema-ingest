@@ -265,9 +265,11 @@ class Ontology {
      * 
      * @param Repo $repo
      * @param bool $verbose
+     * @param bool $manageTransactions
      * @return void
      */
-    public function importVocabularies(Repo $repo, bool $verbose): void {
+    public function importVocabularies(Repo $repo, bool $verbose,
+                                       bool $manageTransactions): void {
         echo $verbose ? "###  Importing external vocabularies\n" : '';
 
         $vocabsProp = $this->schema->ontology->vocabs;
@@ -281,7 +283,13 @@ class Ontology {
                 } catch (RequestException $e) {
                     echo $verbose ? "    fetch error" . $e->getMessage() . "\n" : '';
                 }
+                if ($manageTransactions) {
+                    $repo->begin();
+                }
                 $vocabulary->update($repo, $verbose);
+                if ($manageTransactions) {
+                    $repo->commit();
+                }
             }
         }
     }
