@@ -272,7 +272,8 @@ class Ontology {
                                        bool $manageTransactions): void {
         echo $verbose ? "###  Importing external vocabularies\n" : '';
 
-        $vocabsProp = $this->schema->ontology->vocabs;
+        $touchCollection = false;
+        $vocabsProp      = $this->schema->ontology->vocabs;
         foreach ($this->ontology->resourcesMatching($vocabsProp) as $res) {
             foreach ($res->all($vocabsProp) as $vocabularyUrl) {
                 $vocabularyUrl = (string) $vocabularyUrl;
@@ -283,13 +284,24 @@ class Ontology {
                     if ($manageTransactions) {
                         $repo->begin();
                     }
-                    $vocabulary->update($repo, $verbose);
+                    $touchCollection |= $vocabulary->update($repo, $verbose);
                     if ($manageTransactions) {
                         $repo->commit();
                     }
                 } catch (RequestException $e) {
                     echo $verbose ? "    fetch error" . $e->getMessage() . "\n" : '';
                 }
+            }
+        }
+
+        if ($touchCollection) {
+            echo $verbose ? "Updating class collection timestamp\n" : '';
+            if ($manageTransactions) {
+                $repo->begin();
+            }
+            $this->createCollection($repo, RDF::OWL_CLASS);
+            if ($manageTransactions) {
+                $repo->commit();
             }
         }
     }

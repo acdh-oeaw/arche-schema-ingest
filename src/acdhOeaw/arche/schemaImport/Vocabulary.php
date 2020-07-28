@@ -84,7 +84,7 @@ class Vocabulary {
         $this->url   = ($this->graph->allOfType(RDF::SKOS_CONCEPT_SCHEMA)[0])->getUri();
     }
 
-    public function update(Repo $repo, bool $verbose): void {
+    public function update(Repo $repo, bool $verbose): bool {
         $turtle     = $this->graph->serialise('text/turtle');
         /* @var $schemaMeta \EasyRdf\Resource */
         $schemaMeta = $this->graph->allOfType(RDF::SKOS_CONCEPT_SCHEMA)[0];
@@ -101,7 +101,7 @@ class Vocabulary {
             $oldHash     = (string) $collRepoRes->getMetadata()->getLiteral($this->schema->hash);
             if ('sha1:' . sha1($turtle) === $oldHash) {
                 echo $verbose ? "    Skipping the update - hashes match\n" : '';
-                return;
+                return false;
             }
         } catch (NotFound $e) {
             $collRepoRes = $repo->createResource($schemaMeta);
@@ -126,6 +126,8 @@ class Vocabulary {
 
         echo $verbose ? "    Removing obsolete concepts...\n" : '';
         Util::removeObsoleteChildren($repo, $this->url, $this->schema->parent, $imported, $verbose);
+        
+        return true;
     }
 
 }
