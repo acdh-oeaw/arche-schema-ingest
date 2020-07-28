@@ -303,6 +303,8 @@ class Ontology {
     private function createCollection(Repo $repo, $id): void {
         try {
             $res = $repo->getResourceById($id);
+            $res->setMetadata($res->getMetadata());
+            $res->updateMetadata();
         } catch (NotFound $e) {
             $meta = (new Graph())->resource('.');
             $meta->addLiteral($this->schema->label, new Literal(preg_replace('|^.*[/#]|', '', $id), 'en'));
