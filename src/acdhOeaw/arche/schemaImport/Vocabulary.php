@@ -28,6 +28,7 @@ namespace acdhOeaw\arche\schemaImport;
 
 use EasyRdf\Graph;
 use EasyRdf\Literal;
+use EasyRdf\Resource;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Request;
 use acdhOeaw\acdhRepoLib\Repo;
@@ -86,14 +87,7 @@ class Vocabulary {
 
     public function update(Repo $repo, bool $verbose): bool {
         $turtle     = $this->graph->serialise('text/turtle');
-        /* @var $schemaMeta \EasyRdf\Resource */
-        $schemaMeta = $this->graph->allOfType(RDF::SKOS_CONCEPT_SCHEMA)[0];
-        $schemaMeta->addResource($this->schema->id, $this->url);
-        $schemaMeta->addResource($this->schema->id, $schemaMeta->getUri());
-        $schemaMeta->deleteResource(RDF::SKOS_HAS_TOP_CONCEPT); // not to create circular dependency hasTopConcept<->inSchema
-        if (null === $schemaMeta->getLiteral($this->schema->label)) {
-            $schemaMeta->addLiteral($this->schema->label, new Literal($this->url, 'en'));
-        }
+        $schemaMeta = $this->sanitizeSchemaMeta();
 
         try {
             $collRepoRes = $repo->getResourceById($this->url);
@@ -126,8 +120,54 @@ class Vocabulary {
 
         echo $verbose ? "    Removing obsolete concepts...\n" : '';
         Util::removeObsoleteChildren($repo, $this->url, $this->schema->parent, $imported, $verbose);
-        
+
         return true;
+    }
+
+    /**
+     * Vocabulary top-level metadata quality is typically very poor and has to
+     * be cleaned up.
+     * 
+     * @return \EasyRdf\Resource
+     */
+    private function sanitizeSchemaMeta(): Resource {
+        /* @var $meta \EasyRdf\Resource */
+        $meta = $this->graph->allOfType(RDF::SKOS_CONCEPT_SCHEMA)[0];
+
+        // add ACDH identifiers
+        $meta->addResource($this->schema->id, $this->url);
+        $meta->addResource($this->schema->id, $meta->getUri());
+
+        // avoid circular dependencies hasTopConcept<->inSchema
+        $meta->deleteResource(RDF::SKOS_HAS_TOP_CONCEPT);
+
+        // add label if needed
+        if (null === $meta->getLiteral($this->schema->label)) {
+            $meta->addLiteral($this->schema->label, new Literal($this->url, 'en'));
+        }
+
+        $vocabsNmsp    = $this->schema->namespaces->ontology;
+        $vocabsNmspLen = strlen($vocabsNmsp);
+        $preserveProp  = [$this->schema->label, $this->schema->id];
+        foreach ($meta->propertyUris() as $p) {
+            if (substr($p, 0, $vocabsNmspLen) === $vocabsNmsp) {
+                if (!in_array($p, $preserveProp)) {
+                    // get rid of all ACDH properties other than label and id 
+                    $meta->deleteResource($p);
+                    $meta->delete($p);
+                }
+            } else {
+                if (!in_array($p, [RDF::RDF_TYPE])) {
+                    // cast all non-ACDH URIs to literals
+                    foreach ($meta->allResources($p) as $r) {
+                        $meta->delete($p, $r);
+                        $meta->addLiteral($p, new Literal($r->getUri(), null, RDF::XSD_ANY_URI));
+                    }
+                }
+            }
+        }
+
+        return $meta;
     }
 
 }
