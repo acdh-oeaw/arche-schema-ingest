@@ -63,7 +63,7 @@ class Util {
             $repoRes = $repo->getResourceById($id);
             echo $verbose ? "updating " . $id : '';
             $repoRes->setMetadata($meta);
-            $repoRes->updateMetadata();
+            $repoRes->updateMetadata(RepoResource::UPDATE_OVERWRITE);
         } catch (NotFound $e) {
             echo $verbose ? "creating " . $id : '';
             $repoRes = $repo->createResource($meta);
