@@ -119,16 +119,12 @@ class Ontology {
             $result      &= $restriction->check(true) ?? true;
         }
         foreach ($this->ontology->allOfType(RDF::OWL_DATATYPE_PROPERTY) as $i) {
-            if (!empty($propNmsp) && substr($i->getUri(), 0, $n) === $propNmsp) {
-                $property = new Property($i, $this->schema);
-                $result   &= $property->check(true);
-            }
+            $property = new Property($i, $this->schema);
+            $result   &= $property->check(true);
         }
         foreach ($this->ontology->allOfType(RDF::OWL_OBJECT_PROPERTY) as $i) {
-            if (!empty($propNmsp) && substr($i->getUri(), 0, $n) === $propNmsp) {
-                $property = new Property($i, $this->schema);
-                $result   &= $property->check(true);
-            }
+            $property = new Property($i, $this->schema);
+            $result   &= $property->check(true);
         }
         return $result;
     }

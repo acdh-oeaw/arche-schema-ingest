@@ -24,7 +24,6 @@
  * THE SOFTWARE.
  */
 
-use acdhOeaw\acdhRepoLib\Repo;
 use acdhOeaw\arche\schemaImport\Ontology;
 
 if ($argc < 3 || !file_exists($argv[1]) || !file_exists($argv[2])) {
