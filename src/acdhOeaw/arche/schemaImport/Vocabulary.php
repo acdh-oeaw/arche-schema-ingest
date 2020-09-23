@@ -143,7 +143,12 @@ class Vocabulary {
 
         // add label if needed
         if (null === $meta->getLiteral($this->schema->label)) {
-            $meta->addLiteral($this->schema->label, new Literal($this->url, 'en'));
+            foreach ($meta->getLiteral('http://purl.org/dc/elements/1.1/title') as $i) {
+                $meta->addLiteral($this->schema->label, $i);
+            }
+            if (null === $meta->getLiteral($this->schema->label)) {
+                $meta->addLiteral($this->schema->label, new Literal($this->url, 'en'));
+            }
         }
 
         $vocabsNmsp    = $this->schema->namespaces->ontology;
