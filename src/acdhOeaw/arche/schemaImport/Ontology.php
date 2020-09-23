@@ -239,11 +239,11 @@ class Ontology {
                 echo $verbose ? "      " . $new->getUri() . "\n" : '';
                 $oldMeta = $old->getGraph();
                 $oldMeta->deleteResource($s->id, $curId);
-                $oldMeta->addResource($s->versioning->isPrevOf, $new->getUri());
                 $old->setGraph($oldMeta);
                 $old->updateMetadata(RepoResource::UPDATE_OVERWRITE); // we must loose the old identifier
 
                 $newMeta->addResource($s->id, $curId);
+                $newMeta->addResource($s->isNewVersionOf, $old->getUri());
                 $new->setMetadata($newMeta);
                 $new->updateMetadata();
             } else {
