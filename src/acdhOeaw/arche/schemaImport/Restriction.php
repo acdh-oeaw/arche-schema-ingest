@@ -112,10 +112,6 @@ class Restriction extends Entity {
             echo $verbose ? "restriction " . $this->res->getUri() . " for class " . $i->getUri() . " and property " . $prop->getUri() . " has min cardinality $max while the maximum supported value is 1\n" : '';
             return false;
         }
-        if (!empty($default) && ($min === '1' || $exact === '1')) {
-            echo $verbose ? "restriction " . $this->res->getUri() . " for class " . $i->getUri() . " and property " . $prop->getUri() . " has min cardinality $min$exact which means its default value of $default will be never used\n" : '';
-            return false;
-        }
 
         // fix class inheritance
         foreach ($children as $i) {
