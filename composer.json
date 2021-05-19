@@ -24,12 +24,11 @@
         "guzzlehttp/guzzle": "^7",
         "acdh-oeaw/easyrdf": "*",
         "acdh-oeaw/arche-schema": "*",
-        "acdh-oeaw/arche-lib": "^2.0.0",
+        "acdh-oeaw/arche-lib": "^2.0.0-alpha",
         "zozlak/rdf-constants": "^1.1.1"
     },
     "require-dev": {
         "phpunit/phpunit": "^9",
         "phpstan/phpstan": "^0.12.76"
-    },
-    "minimum-stability": "alpha"
+    }
 }
