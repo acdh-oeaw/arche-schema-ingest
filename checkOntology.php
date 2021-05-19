@@ -1,5 +1,6 @@
 #!/usr/bin/php
 <?php
+
 /*
  * The MIT License
  *
@@ -31,7 +32,7 @@ if ($argc < 3 || !file_exists($argv[1]) || !file_exists($argv[2])) {
     echo "usage: $argv[0] config.yaml ontology.owl\n\n";
     return;
 }
-$cfg = json_decode(json_encode(yaml_parse_file($argv[1])));
+$cfg = json_decode((string) json_encode(yaml_parse_file($argv[1])));
 
 if (isset($cfg->composerLocation)) {
     require_once $cfg->composerLocation;
