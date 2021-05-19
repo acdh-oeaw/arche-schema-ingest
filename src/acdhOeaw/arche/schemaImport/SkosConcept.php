@@ -50,11 +50,11 @@ class SkosConcept {
     public function getUri(): string {
         return (string) $this->res->getUri();
     }
-    
+
     public function getMetadata(): Resource {
         return $this->res;
     }
-    
+
     /**
      * Sanitizes a SKOS concept by adding a repository id, assuring it has a title,
      * etc.
@@ -82,8 +82,7 @@ class SkosConcept {
         $titles[$defaultLang] = $titles[$defaultLang] ?? ($titles[''] ?? (reset($titles) ?? $this->res->getUri()));
         unset($titles['']);
         foreach ($titles as $lang => $title) {
-            $this->res->addLiteral($schema->label, new Literal($title, $lang));
+            $this->res->addLiteral($schema->label, new Literal((string) $title, (string) $lang));
         }
     }
-
 }

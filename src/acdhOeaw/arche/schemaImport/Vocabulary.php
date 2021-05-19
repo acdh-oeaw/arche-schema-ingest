@@ -31,9 +31,9 @@ use EasyRdf\Literal;
 use EasyRdf\Resource;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Request;
-use acdhOeaw\acdhRepoLib\Repo;
-use acdhOeaw\acdhRepoLib\BinaryPayload;
-use acdhOeaw\acdhRepoLib\exception\NotFound;
+use acdhOeaw\arche\lib\Repo;
+use acdhOeaw\arche\lib\BinaryPayload;
+use acdhOeaw\arche\lib\exception\NotFound;
 use zozlak\RdfConstants as RDF;
 
 /**

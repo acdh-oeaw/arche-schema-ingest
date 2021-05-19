@@ -35,7 +35,11 @@ use zozlak\RdfConstants as RDF;
  */
 class Property extends Entity {
 
-    static private $literalTypes = [
+    /**
+     * 
+     * @var array<string>
+     */
+    static private array $literalTypes = [
         RDF::XSD_BOOLEAN,
         RDF::XSD_DATE, RDF::XSD_TIME, RDF::XSD_DATE_TIME, RDF::XSD_DURATION,
         RDF::XSD_DECIMAL, RDF::XSD_INTEGER,

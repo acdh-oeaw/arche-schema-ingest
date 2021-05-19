@@ -27,11 +27,12 @@
 namespace acdhOeaw\arche\schemaImport;
 
 use EasyRdf\Resource;
-use acdhOeaw\acdhRepoLib\Repo;
-use acdhOeaw\acdhRepoLib\RepoResource;
-use acdhOeaw\acdhRepoLib\SearchConfig;
-use acdhOeaw\acdhRepoLib\SearchTerm;
-use acdhOeaw\acdhRepoLib\exception\NotFound;
+use GuzzleHttp\Exception\RequestException;
+use acdhOeaw\arche\lib\Repo;
+use acdhOeaw\arche\lib\RepoResource;
+use acdhOeaw\arche\lib\SearchConfig;
+use acdhOeaw\arche\lib\SearchTerm;
+use acdhOeaw\arche\lib\exception\NotFound;
 use zozlak\RdfConstants as RDF;
 
 /**
@@ -41,6 +42,15 @@ use zozlak\RdfConstants as RDF;
  */
 class Util {
 
+    /**
+     * 
+     * @param Repo $repo
+     * @param string $collectionId
+     * @param string $parentProp
+     * @param array<string> $imported
+     * @param bool $verbose
+     * @return void
+     */
     static public function removeObsoleteChildren(Repo $repo,
                                                   string $collectionId,
                                                   string $parentProp,
@@ -67,7 +77,7 @@ class Util {
         } catch (NotFound $e) {
             echo $verbose ? "creating " . $id : '';
             $repoRes = $repo->createResource($meta);
-        } catch (GuzzleHttp\Exception\RequestException $e) {
+        } catch (RequestException $e) {
             echo $verbose ? "\n" . $meta->getGraph()->serialise('turtle') . "\n" : '';
             throw $e;
         }
@@ -86,7 +96,7 @@ class Util {
         foreach ($from->getGraph()->resourcesMatching(RDF::RDFS_SUB_CLASS_OF, $from) as $i) {
             $flag |= self::doesInherit($what, $i);
         }
-        return $flag;
+        return (bool) $flag;
     }
 
 }

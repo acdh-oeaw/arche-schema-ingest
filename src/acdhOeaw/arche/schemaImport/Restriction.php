@@ -51,6 +51,7 @@ class Restriction extends Entity {
      */
     public function check(bool $verbose): ?bool {
         $base = $this->schema->namespaces->ontology;
+        $i = null;
 
         // there must be at least one class connected with the restriction 
         // (which in owl terms means there must be at least one class inheriting from the restriction)
@@ -64,52 +65,54 @@ class Restriction extends Entity {
         $prop = $this->res->getResource(RDF::OWL_ON_PROPERTY);
         if ($prop === null) {
             echo $verbose ? $this->res->getUri() . " - it lacks owl:onProperty\n" : '';
-        }
-        $propDomain = $prop->getResource(RDF::RDFS_DOMAIN);
-        if ($propDomain === null) {
-            echo $verbose ? $this->res->getUri() . " - property " . $prop->getUri() . " has no rdfs:domain\n" : '';
-            return false;
-        }
-        $propRange = $prop->getResource(RDF::RDFS_RANGE);
-        if ($propRange === null) {
-            echo $verbose ? $this->res->getUri() . " - property " . $prop->getUri() . " has no rdfs:range\n" : '';
-            return false;
-        }
+        } else {
+            $propDomain = $prop->getResource(RDF::RDFS_DOMAIN);
+            if ($propDomain === null) {
+                echo $verbose ? $this->res->getUri() . " - property " . $prop->getUri() . " has no rdfs:domain\n" : '';
+                return false;
+            }
+            $propRange = $prop->getResource(RDF::RDFS_RANGE);
+            if ($propRange === null) {
+                echo $verbose ? $this->res->getUri() . " - property " . $prop->getUri() . " has no rdfs:range\n" : '';
+                return false;
+            }
 
-        // classes inheriting from the restriction must match or inherit from restriction's property domain
-        // violation example:
-        //   A isSubclassOf R [A has restriction R]
-        //   R onProperty P
-        //   P domain B
-        //   A is not subclassOf B
-        foreach ($children as $i) {
-            if (!Util::doesInherit($i, $propDomain)) {
-                echo $verbose ? "restriction for class " . $i->getUri() . " and property " . $prop->getUri() . " - the class is not a subclass of property's domain (" . $propDomain->getUri() . ")\n" : '';
+            // classes inheriting from the restriction must match or inherit from restriction's property domain
+            // violation example:
+            //   A isSubclassOf R [A has restriction R]
+            //   R onProperty P
+            //   P domain B
+            //   A is not subclassOf B
+            foreach ($children as $i) {
+                if (!Util::doesInherit($i, $propDomain)) {
+                    echo $verbose ? "restriction for class " . $i->getUri() . " and property " . $prop->getUri() . " - the class is not a subclass of property's domain (" . $propDomain->getUri() . ")\n" : '';
+                    return false;
+                }
+            }
+            
+            $simplify = count($this->res->allResources(RDF::OWL_ON_CLASS)) + count($this->res->allResources(RDF::OWL_ON_DATA_RANGE));
+            if ($simplify) {
+                echo $verbose ? "restriction " . $this->res->getUri() . " for class " . $i->getUri() . " and property " . $prop->getUri() . " is a qualified one\n" : '';
                 return false;
             }
         }
 
-        $simplify = count($this->res->allResources(RDF::OWL_ON_CLASS)) + count($this->res->allResources(RDF::OWL_ON_DATA_RANGE));
-        if ($simplify) {
-            echo $verbose ? "restriction " . $this->res->getUri() . " for class " . $i->getUri() . " and property " . $prop->getUri() . " is a qualified one\n" : '';
-            return false;
-        }
 
         $min       = (string) $this->res->getLiteral(RDF::OWL_MIN_CARDINALITY);
         $max       = (string) $this->res->getLiteral(RDF::OWL_MAX_CARDINALITY);
         $exact     = (string) $this->res->getLiteral(RDF::OWL_CARDINALITY);
-        $default   = (string) $this->res->getResource(RDF::OWL_ON_PROPERTY)->getLiteral($base . 'defaultValue');
-        $automated = (string) $this->res->getResource(RDF::OWL_ON_PROPERTY)->getLiteral($base . 'automatedFill');
+        $default   = (string) $this->res->getResource(RDF::OWL_ON_PROPERTY)?->getLiteral($base . 'defaultValue');
+        $automated = (string) $this->res->getResource(RDF::OWL_ON_PROPERTY)?->getLiteral($base . 'automatedFill');
         if (!empty($exact) && $exact !== '1') {
-            echo $verbose ? "restriction " . $this->res->getUri() . " for class " . $i->getUri() . " and property " . $prop->getUri() . " has cardinality $exact while the only supported value is 1\n" : '';
+            echo $verbose ? "restriction " . $this->res->getUri() . " for class " . $i?->getUri() . " and property " . $prop?->getUri() . " has cardinality $exact while the only supported value is 1\n" : '';
             return false;
         }
         if (!empty($max) && $max !== '1') {
-            echo $verbose ? "restriction " . $this->res->getUri() . " for class " . $i->getUri() . " and property " . $prop->getUri() . " has max cardinality $max while the only supported value is 1\n" : '';
+            echo $verbose ? "restriction " . $this->res->getUri() . " for class " . $i?->getUri() . " and property " . $prop?->getUri() . " has max cardinality $max while the only supported value is 1\n" : '';
             return false;
         }
         if (!empty($min) && (int) $min > 1) {
-            echo $verbose ? "restriction " . $this->res->getUri() . " for class " . $i->getUri() . " and property " . $prop->getUri() . " has min cardinality $max while the maximum supported value is 1\n" : '';
+            echo $verbose ? "restriction " . $this->res->getUri() . " for class " . $i?->getUri() . " and property " . $prop?->getUri() . " has min cardinality $max while the maximum supported value is 1\n" : '';
             return false;
         }
 
@@ -125,5 +128,4 @@ class Restriction extends Entity {
     public function getId(): string {
         return $this->id;
     }
-
 }

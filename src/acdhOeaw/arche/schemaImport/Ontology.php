@@ -26,16 +26,17 @@
 
 namespace acdhOeaw\arche\schemaImport;
 
+use RuntimeException;
 use EasyRdf\Graph;
 use EasyRdf\Literal;
 use EasyRdf\Resource;
 use GuzzleHttp\Exception\RequestException;
-use acdhOeaw\acdhRepoLib\BinaryPayload;
-use acdhOeaw\acdhRepoLib\Repo;
-use acdhOeaw\acdhRepoLib\RepoResource;
-use acdhOeaw\acdhRepoLib\SearchConfig;
-use acdhOeaw\acdhRepoLib\SearchTerm;
-use acdhOeaw\acdhRepoLib\exception\NotFound;
+use acdhOeaw\arche\lib\BinaryPayload;
+use acdhOeaw\arche\lib\Repo;
+use acdhOeaw\arche\lib\RepoResource;
+use acdhOeaw\arche\lib\SearchConfig;
+use acdhOeaw\arche\lib\SearchTerm;
+use acdhOeaw\arche\lib\exception\NotFound;
 use zozlak\RdfConstants as RDF;
 
 /**
@@ -45,26 +46,19 @@ use zozlak\RdfConstants as RDF;
  */
 class Ontology {
 
-    // restrictions go first as checkRestriction() can affect the whole graph
-    static private $collections = [
+    /**
+     * restrictions go first as checkRestriction() can affect the whole graph
+     * @var array<string>
+     */
+    static private array $collections = [
         RDF::OWL_ANNOTATION_PROPERTY,
         RDF::OWL_RESTRICTION,
         RDF::OWL_CLASS,
         RDF::OWL_OBJECT_PROPERTY,
         RDF::OWL_DATATYPE_PROPERTY,
     ];
-
-    /**
-     *
-     * @var \EasyRdf\Graph
-     */
-    private $ontology;
-
-    /**
-     *
-     * @var \object
-     */
-    private $schema;
+    private Graph $ontology;
+    private object $schema;
 
     /**
      * 
@@ -126,7 +120,7 @@ class Ontology {
             $property = new Property($i, $this->schema);
             $result   &= $property->check(true);
         }
-        return $result;
+        return (bool) $result;
     }
 
     /**
@@ -195,7 +189,7 @@ class Ontology {
      * @param string $owlPath
      * @param bool $verbose
      * @return void
-     * @throws Exception
+     * @throws RuntimeException
      */
     public function importOwlFile(Repo $repo, string $owlPath, bool $verbose): void {
         $s = $this->schema;
@@ -229,7 +223,7 @@ class Ontology {
 
             $hash = (string) $old->getGraph()->getLiteral($s->hash);
             if (!preg_match('/^(md5|sha1):/', $hash)) {
-                throw new Exception("fixity hash $hash not implemented - update the script");
+                throw new RuntimeException("fixity hash $hash not implemented - update the script");
             }
             $md5  = 'md5:' . md5_file($owlPath);
             $sha1 = 'sha1:' . sha1_file($owlPath);
@@ -305,17 +299,17 @@ class Ontology {
     /**
      * 
      * @param Repo $repo
-     * @param type $id
+     * @param string $id
      * @return void
      */
-    private function createCollection(Repo $repo, $id): void {
+    private function createCollection(Repo $repo, string $id): void {
         try {
             $res = $repo->getResourceById($id);
             $res->setMetadata($res->getMetadata());
             $res->updateMetadata();
         } catch (NotFound $e) {
             $meta = (new Graph())->resource('.');
-            $meta->addLiteral($this->schema->label, new Literal(preg_replace('|^.*[/#]|', '', $id), 'en'));
+            $meta->addLiteral($this->schema->label, new Literal((string) preg_replace('|^.*[/#]|', '', $id), 'en'));
             $meta->addResource($this->schema->id, $id);
             $res  = $repo->createResource($meta);
         }
@@ -329,7 +323,7 @@ class Ontology {
      * @param string $id desired owl object identifier (may differ from $res URI
      * @param string $parentId collection in which a repository repository 
      *   resource should be created
-     * @return string URL of a created/updated repository resource
+     * @return \EasyRdf\Resource URL of a created/updated repository resource
      */
     function sanitizeOwlObject(Resource $res, string $id, string $parentId): Resource {
         $meta = (new Graph())->resource('.');
@@ -355,5 +349,4 @@ class Ontology {
 
         return $meta;
     }
-
 }
