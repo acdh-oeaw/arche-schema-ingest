@@ -24,7 +24,7 @@
         "guzzlehttp/guzzle": "^7",
         "acdh-oeaw/easyrdf": "*",
         "acdh-oeaw/arche-schema": "*",
-        "acdh-oeaw/arche-lib": ">=2.0.4 <=5",
+        "acdh-oeaw/arche-lib": ">=2.0.4 <6",
         "zozlak/rdf-constants": "^1.1.1"
     },
     "require-dev": {
