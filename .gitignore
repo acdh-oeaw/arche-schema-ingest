@@ -2,3 +2,6 @@
 /vendor
 /nbproject
 /config.yaml
+/config
+/log
+/.phpunit.result.cache

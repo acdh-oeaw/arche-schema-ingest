@@ -1,0 +1,45 @@
+name: phpunit
+
+on: push
+
+jobs:
+  phpunit:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: clone repo config
+      run: |
+        git clone --depth 1 --branch arche https://github.com/acdh-oeaw/arche-docker-config.git config
+        chmod -x config/run.d/* config/initScripts/*
+        chmod +x config/run.d/postgresql.sh config/run.d/config-yaml.sh config/run.d/xdebug.sh config/initScripts/00-cleanup.sh config/initScripts/01-adminPswd.php
+        sed -i -e 's/checkUnknownProperties:.*/checkUnknownProperties: false/g' config/yaml/doorkeeper.yaml
+        sed -i -e 's/checkAutoCreatedResources:.*/checkAutoCreatedResources: false/g' config/yaml/doorkeeper.yaml
+        sed -i -e 's/checkVocabularyValues:.*/checkVocabularyValues: false/g' config/yaml/doorkeeper.yaml
+    - name: run repo docker
+      run: |
+        mkdir log
+        docker run --name arche -p 80:80 -v `pwd`/log:/home/www-data/log -v `pwd`/config:/home/www-data/config -e USER_UID=`id -u` -e USER_GID=`id -g` -e ADMIN_PSWD=pswd -d acdhch/arche
+    - name: composer update
+      run: |
+        composer update
+    - name: wait
+      run: |
+        while [ "`grep '# INIT SCRIPTS ENDED' log/initScripts.log | wc -l`" != "1" ]; do
+          tail log/initScripts.log || true
+          echo "Waiting until repository is ready..."
+          echo "-----"
+          sleep 10
+        done
+        cat log/initScripts.log
+    #- uses: mxschmitt/action-tmate@v3
+    - name: test
+      run: |
+        mkdir -p build/logs
+        XDEBUG_MODE=coverage ./vendor/bin/phpunit
+    - name: coveralls
+      run: |
+        export COVERALLS_RUN_LOCALLY=1
+        export COVERALLS_REPO_TOKEN=${{ secrets.coverallsToken }}
+        composer require -W php-coveralls/php-coveralls
+        php vendor/bin/php-coveralls -v
+
