@@ -3,6 +3,7 @@
   <coverage processUncoveredFiles="true">
     <include>
       <directory suffix=".php">src</directory>
+      <directory suffix=".php">bin</directory>
     </include>
     <report>
       <clover outputFile="build/logs/clover.xml"/>

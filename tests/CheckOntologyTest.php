@@ -31,35 +31,16 @@ namespace acdhOeaw\arche\schemaImport\tests;
  *
  * @author zozlak
  */
-class IngestOntologyTest extends \PHPUnit\Framework\TestCase {
+class CheckOntologyTest extends \PHPUnit\Framework\TestCase {
 
     public function testSimple(): void {
         $_SERVER['argv'] = [
-            'arche-import-ontology',
-            '--user', 'admin',
-            '--pswd', 'pswd',
-            '--concurrency', '5',
-            '--skipVocabularies',
-            'http://127.0.0.1/api'
+            'arche-check-ontology',
+            'http://127.0.0.1/api',
+            __DIR__ . '/../vendor/acdh-oeaw/arche-schema/acdh-schema.owl',
         ];
-        require __DIR__ . '/../bin/arche-import-ontology';
-        $this->assertTrue(true);
-    }
-
-    public function testFull(): void {
-        $_SERVER['argv'] = [
-            'arche-import-ontology',
-            '--user', 'admin',
-            '--pswd', 'pswd',
-            '--concurrency', '5',
-            '--ontologyFile', __DIR__ . '/../vendor/acdh-oeaw/arche-schema/acdh-schema.owl',
-            '--ontologyVersion', '99.0.0',
-            '--ontologyUrl', 'https://github.com/acdh-oeaw/arche-schema',
-            '--ontologyDate', '2099-12-31',
-            '--ontologyInfo', 'Fake ontology version',
-            'http://127.0.0.1/api'
-        ];
-        require __DIR__ . '/../bin/arche-import-ontology';
+        require __DIR__ . '/../bin/arche-check-ontology';
+        // as for now test just for no error
         $this->assertTrue(true);
     }
 }
