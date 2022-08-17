@@ -31,26 +31,29 @@ use zozlak\argparse\ArgumentParser as AP;
 use acdhOeaw\arche\schemaImport\Metadata;
 
 $args = new AP("Imports an OWL ontology into the ARCHE repository.");
+$args->addArgument('--user', help: 'Repository user used to perform the ingestiton');
+$args->addArgument('--pswd', help: 'Repository user password');
 $args->addArgument('--concurrency', type: AP::TYPE_INT, default: 3);
 $args->addArgument('--verbose', action: 'store_true');
 $args->addArgument('--skipBinary', action: 'store_true');
 $args->addArgument('--skipVocabularies', action: 'store_true');
-$args->addArgument('--ontologyFile', help: 'OWL file to read list of vocabularies from. If not provided, a file from the acdh-oeaw/arche-schema composer library will be used.');
+$args->addArgument('--ontologyFile', help: 'OWL file to read list of vocabularies from. If not provided, an ontology file from the currently installed acdh-oeaw/arche-schema composer library will be used.');
 $args->addArgument('--ontologyVersion', help: 'Onotology version. Use only when --ontologyFile is provided.');
 $args->addArgument('--ontologyUrl', help: 'Onotology version URL. Use only when --ontologyFile is provided.');
 $args->addArgument('--ontologyDate', help: 'Onotology version release date. Use only when --ontologyFile is provided.');
 $args->addArgument('--ontologyInfo', help: 'Onotology version info. Use only when --ontologyFile is provided.');
-$args->addArgument('configFile', help: 'YAML file providing repository configuration');
+$args->addArgument('repositoryUrl', help: 'Repository base URL');
 $args = $args->parseArgs();
 
-$t0         = time();
-$cfg        = json_decode((string) json_encode(yaml_parse_file($args->configFile)));
-$repo       = acdhOeaw\arche\lib\Repo::factory($args->configFile);
-$schemaPath = \Composer\InstalledVersions::getInstallPath('acdh-oeaw/arche-schema');
+$t0           = time();
+$opts         = ['auth' => [$args->user, $args->pswd]];
+$repo         = acdhOeaw\arche\lib\Repo::factoryFromUrl($args->repositoryUrl, $opts);
+$schema       = $repo->getSchema();
+$ontologyPath = \Composer\InstalledVersions::getInstallPath('acdh-oeaw/arche-schema');
 
-$ontology = new acdhOeaw\arche\schemaImport\Ontology($cfg->schema);
+$ontology = new acdhOeaw\arche\schemaImport\Ontology($schema);
 if (empty($args->ontologyFile)) {
-    $ontology->loadFile("$schemaPath/acdh-schema.owl");
+    $ontology->loadFile("$ontologyPath/acdh-schema.owl");
 } else {
     $ontology->loadFile($args->ontologyFile);
 }
@@ -59,14 +62,14 @@ try {
     $ontology->import($repo, $args->verbose, $args->concurrency);
     if (!$args->skipBinary) {
         $collMeta     = $ontologyMeta = null;
-        $collMeta     = Metadata::fromFile("$schemaPath/metadata/collection.ttl");
-        $ontologyMeta = Metadata::fromFile("$schemaPath/metadata/resource.ttl");
+        $collMeta     = Metadata::fromFile("$ontologyPath/metadata/collection.ttl");
+        $ontologyMeta = Metadata::fromFile("$ontologyPath/metadata/resource.ttl");
         if (empty($args->ontologyFile)) {
             echo "Reading ontology metadata from composer and github\n";
-            $ontologyFile = Metadata::enrichFromComposer($ontologyMeta, $cfg->schema->ontology, 'acdh-oeaw/arche-schema');
+            $ontologyFile = Metadata::enrichFromComposer($ontologyMeta, $schema->ontology, 'acdh-oeaw/arche-schema');
         } else {
             echo "Creating ontology metadata from call parameters";
-            Metadata::enrichFromArgs($ontologyMeta, $cfg->schema->ontology, $args);
+            Metadata::enrichFromArgs($ontologyMeta, $schema->ontology, $args);
             $ontologyFile = $args->ontologyFile;
         }
         $ontology->importOwlFile($repo, $ontologyFile, $args->verbose, $collMeta, $ontologyMeta);

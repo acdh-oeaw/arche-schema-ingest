@@ -28,15 +28,18 @@
 require_once __DIR__ . "/loadComposer.php";
 
 $args = new zozlak\argparse\ArgumentParser("Checks if an OWL ontology is valid for ARCHE.");
-$args->addArgument('configFile', help: 'YAML file providing repository configuration');
+$args->addArgument('configFileOrRepositoryUrl', help: 'YAML file providing repository configuration or repository base URL');
 $args->addArgument('ontologyFile', help: 'OWL file to be checked');
 $args = $args->parseArgs();
 
-$cfg = json_decode((string) json_encode(yaml_parse_file($args->configFile)));
-
-$ontology = new acdhOeaw\arche\schemaImport\Ontology($cfg->schema);
+if (file_exists($args->configFileOrRepositoryUrl)) {
+    $schema = json_decode((string) json_encode(yaml_parse_file($args->configFileOrRepositoryUrl)))->schema;
+} else {
+    $schema = acdhOeaw\arche\lib\Repo::factoryFromUrl($args->configFileOrRepositoryUrl)->getSchema();
+}
+$ontology = new acdhOeaw\arche\schemaImport\Ontology($schema);
 $ontology->loadFile($args->ontologyFile);
-$result   = $ontology->check($cfg->schema->namespaces->ontology);
+$result   = $ontology->check($schema->namespaces->ontology);
 echo $result ? "OK\n" : "";
 exit($result ? 0 : 1);
 

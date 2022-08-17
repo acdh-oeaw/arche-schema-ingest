@@ -1,11 +1,4 @@
-rest:
-    urlBase: http://127.0.0.1
-    pathBase: /api/
-    headers:
-        metadataReadMode: X-METADATA-READ-MODE
-        metadataParentProperty: X-PARENT-PROPERTY
-        metadataWriteMode: X-METADATA-WRITE-MODE
-        transactionId: X-TRANSACTION-ID
+# A minimum set of schema mappings required for the ontology ingestion
 schema:
     id: https://vocabs.acdh.oeaw.ac.at/schema#hasIdentifier
     label: https://vocabs.acdh.oeaw.ac.at/schema#hasTitle
@@ -29,8 +22,3 @@ schema:
         url: https://vocabs.acdh.oeaw.ac.at/schema#hasUrl
         version: https://vocabs.acdh.oeaw.ac.at/schema#hasVersion
         info: https://vocabs.acdh.oeaw.ac.at/schema#hasVersionInfo
-auth:
-    httpBasic:
-        user: ''
-        password: ''
-
