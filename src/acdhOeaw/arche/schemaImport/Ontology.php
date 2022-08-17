@@ -217,7 +217,6 @@ class Ontology {
             if ($meta === null) {
                 $meta = (new Graph())->resource('.');
             }
-            $meta = $meta->resource('.');
             $meta->addResource($s->id, $collId);
             if (null === $meta->getLiteral($s->label)) {
                 $meta->addLiteral($s->label, new Literal('ACDH ontology binaries', 'en'));
