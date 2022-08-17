@@ -35,7 +35,7 @@ class CheckOntologyTest extends \PHPUnit\Framework\TestCase {
 
     public function testSimple(): void {
         $_SERVER['argv'] = [
-            'arche-check-ontology',
+            'test',
             'http://127.0.0.1/api',
             __DIR__ . '/../vendor/acdh-oeaw/arche-schema/acdh-schema.owl',
         ];

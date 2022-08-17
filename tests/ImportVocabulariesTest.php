@@ -35,7 +35,7 @@ class ImportVocabulariesTest extends \PHPUnit\Framework\TestCase {
 
     public function testSimple(): void {
         $_SERVER['argv'] = [
-            'arche-import-vocabularies',
+            'test',
             '--user', 'admin',
             '--pswd', 'pswd',
             '--vocabularyLocation', 'https://vocabs.acdh.oeaw.ac.at/rest/v1/arche_category/data',
@@ -50,7 +50,7 @@ class ImportVocabulariesTest extends \PHPUnit\Framework\TestCase {
 
     public function testFull(): void {
         $_SERVER['argv'] = [
-            'arche-import-vocabularies',
+            'test',
             '--user', 'admin',
             '--pswd', 'pswd',
             '--concurrency', '5',

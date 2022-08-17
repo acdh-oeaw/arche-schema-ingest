@@ -31,11 +31,11 @@ namespace acdhOeaw\arche\schemaImport\tests;
  *
  * @author zozlak
  */
-class IngestOntologyTest extends \PHPUnit\Framework\TestCase {
+class ImportOntologyTest extends \PHPUnit\Framework\TestCase {
 
     public function testSimple(): void {
         $_SERVER['argv'] = [
-            'arche-import-ontology',
+            'test',
             '--user', 'admin',
             '--pswd', 'pswd',
             '--concurrency', '5',
@@ -48,7 +48,7 @@ class IngestOntologyTest extends \PHPUnit\Framework\TestCase {
 
     public function testFull(): void {
         $_SERVER['argv'] = [
-            'arche-import-ontology',
+            'test',
             '--user', 'admin',
             '--pswd', 'pswd',
             '--concurrency', '5',
