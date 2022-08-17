@@ -20,15 +20,22 @@
         }
     },
     "require": {
-        "php": ">= 7.3",
+        "php": ">= 8",
         "guzzlehttp/guzzle": "^7",
         "acdh-oeaw/easyrdf": "*",
         "acdh-oeaw/arche-schema": "*",
-        "acdh-oeaw/arche-lib": ">=2.0.4 <6",
-        "zozlak/rdf-constants": "^1.1.1"
+        "acdh-oeaw/arche-lib-ingest": "^3.3.0",
+        "zozlak/rdf-constants": "^1.2.1",
+        "zozlak/argparse": "^1.0",
+        "composer-runtime-api": "^2.1"
     },
     "require-dev": {
         "phpunit/phpunit": "^9",
-        "phpstan/phpstan": "^0.12.76"
-    }
+        "phpstan/phpstan": "*"
+    },
+    "bin": [
+        "bin/arche-import-ontology",
+        "bin/arche-check-ontology",
+        "bin/arche-import-vocabularies"
+    ]
 }

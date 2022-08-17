@@ -1,0 +1,86 @@
+#!/usr/bin/php
+<?php
+
+/*
+ * The MIT License
+ *
+ * Copyright 2020 Austrian Centre for Digital Humanities.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
+require_once __DIR__ . "/loadComposer.php";
+
+use zozlak\argparse\ArgumentParser as AP;
+use acdhOeaw\arche\lib\ingest\SkosVocabulary as SV;
+use acdhOeaw\arche\lib\ingest\MetadataCollection as MC;
+
+$args = new AP("Imports SKOS vocabularies into ARCHE.");
+$args->addArgument('--concurrency', type: AP::TYPE_INT, default: 3);
+$args->addArgument('--verbose', action: 'store_true');
+$args->addArgument('--force', action: 'store_true');
+$args->addArgument('--ontologyFile', help: 'OWL file to read list of vocabularies from. If not provided, the ontology is read from the repository.');
+$args->addArgument('--vocabularyLocation', help: "Explicit vocabulary dump URL or file. When provided, only a given vocabulary is imported and it doesn't matter if it's defined in the ontology or not. Takes precedence over --ontologyFile.");
+$args->addArgument('configFile', help: 'YAML file providing repository configuration.');
+$args = $args->parseArgs();
+
+$t0   = time();
+$cfg  = json_decode((string) json_encode(yaml_parse_file($args->configFile)));
+$repo = acdhOeaw\arche\lib\Repo::factory($args->configFile);
+if (!empty($args->vocabularyLocation)) {
+    if (file_exists($args->vocabularyLocation)) {
+        $vocabulary = new SV($repo, $args->vocabularyLocation);
+    } else {
+        $vocabulary = SV::fromUrl($repo, $args->vocabularyLocation);
+    }
+    if ($args->force || $vocabulary->getState() !== SV::STATE_OK) {
+        SV::$debug = $args->verbose ? 2 : 1;
+        $vocabulary
+            ->setExactMatchMode(SV::EXACTMATCH_MERGE, SV::EXACTMATCH_MERGE)
+            ->setSkosRelationsMode(SV::RELATIONS_KEEP, SV::RELATIONS_DROP)
+            ->forceUpdate();
+        $vocabulary->preprocess();
+        try {
+            $repo->begin();
+            $vocabulary->import('', MC::SKIP, MC::ERRMODE_FAIL, $args->concurrency, $args->concurrency);
+            $repo->commit();
+        } finally {
+            if ($repo->inTransaction()) {
+                $repo->rollback();
+            }
+        }
+    }
+} else {
+    $ontology = new acdhOeaw\arche\schemaImport\Ontology($cfg->schema);
+    if (!empty($args->ontologyFile)) {
+        $ontology->loadFile($args->ontologyFile);
+    } else {
+        $ontology->loadRepo($repo);
+    }
+    try {
+        $ontology->importVocabularies($repo, $args->verbose, true, $args->concurrency, $args->force);
+    } finally {
+        if ($repo->inTransaction()) {
+            $repo->rollback();
+        }
+    }
+}
+
+echo "\nFinished in " . (time() - $t0) . "s\n";
+

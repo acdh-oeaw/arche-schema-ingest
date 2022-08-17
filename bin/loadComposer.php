@@ -1,10 +1,9 @@
-#!/usr/bin/php
 <?php
 
 /*
  * The MIT License
  *
- * Copyright 2020 Austrian Centre for Digital Humanities.
+ * Copyright 2022 Austrian Centre for Digital Humanities.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,38 +24,19 @@
  * THE SOFTWARE.
  */
 
-use acdhOeaw\arche\lib\Repo;
-use acdhOeaw\arche\schemaImport\Ontology;
-
-$t0 = time();
-
-if ($argc < 2 || !file_exists($argv[1])) {
-    echo "Imports external vocabularies defined in the ontology.\n\n";
-    echo "usage: $argv[0] config.yaml [ontology.owl]\n\n";
-    return;
-}
-$cfg = json_decode((string) json_encode(yaml_parse_file($argv[1])));
-
-if (isset($cfg->composerLocation)) {
-    require_once $cfg->composerLocation;
-} else {
-    require_once __DIR__ . '/vendor/autoload.php';
-}
-
-$repo = Repo::factory($argv[1]);
-
-$ontology = new Ontology($cfg->schema);
-if ($argc > 2) {
-    $ontology->loadFile($argv[2]);
-} else {
-    $ontology->loadRepo($repo);
-}
-
-try {
-    $ontology->importVocabularies($repo, true, true);
-} finally {
-    if ($repo->inTransaction()) {
-        $repo->rollback();
+$dir = $_ENV['COMPOSER_DIR'] ?? __DIR__;
+$composer = null;
+while ($dir !== dirname($dir)) {
+    if (file_exists("$dir/autoload.php")) {
+        $composer = require_once "$dir/autoload.php";
+        break;
+    } elseif (file_exists("$dir/vendor/autoload.php")) {
+        $composer = require_once "$dir/vendor/autoload.php";
+        break;
     }
+    $dir = dirname($dir);
 }
-echo "\nFinished in " . (time() - $t0) . "s\n";
+if ($composer === null) {
+    throw new RuntimeException('Composer not found');
+}
+return $composer;

@@ -25,22 +25,18 @@
  * THE SOFTWARE.
  */
 
-use acdhOeaw\arche\schemaImport\Ontology;
+require_once __DIR__ . "/loadComposer.php";
 
-if ($argc < 3 || !file_exists($argv[1]) || !file_exists($argv[2])) {
-    echo "Checks if an OWL ontology is valid for ARCHE.\n\n";
-    echo "usage: $argv[0] config.yaml ontology.owl\n\n";
-    return;
-}
-$cfg = json_decode((string) json_encode(yaml_parse_file($argv[1])));
+$args = new zozlak\argparse\ArgumentParser("Checks if an OWL ontology is valid for ARCHE.");
+$args->addArgument('configFile', help: 'YAML file providing repository configuration');
+$args->addArgument('ontologyFile', help: 'OWL file to be checked');
+$args = $args->parseArgs();
 
-if (isset($cfg->composerLocation)) {
-    require_once $cfg->composerLocation;
-} else {
-    require_once __DIR__ . '/vendor/autoload.php';
-}
+$cfg = json_decode((string) json_encode(yaml_parse_file($args->configFile)));
 
-$ontology = new Ontology($cfg->schema);
-$ontology->loadFile($argv[2]);
+$ontology = new acdhOeaw\arche\schemaImport\Ontology($cfg->schema);
+$ontology->loadFile($args->ontologyFile);
 $result   = $ontology->check($cfg->schema->namespaces->ontology);
+echo $result ? "OK\n" : "";
 exit($result ? 0 : 1);
+

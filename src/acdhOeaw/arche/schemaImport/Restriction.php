@@ -26,6 +26,7 @@
 
 namespace acdhOeaw\arche\schemaImport;
 
+use EasyRdf\Resource;
 use zozlak\RdfConstants as RDF;
 
 /**
@@ -51,7 +52,7 @@ class Restriction extends Entity {
      */
     public function check(bool $verbose): ?bool {
         $base = $this->schema->namespaces->ontology;
-        $i = null;
+        $i    = null;
 
         // there must be at least one class connected with the restriction 
         // (which in owl terms means there must be at least one class inheriting from the restriction)
@@ -84,12 +85,12 @@ class Restriction extends Entity {
             //   P domain B
             //   A is not subclassOf B
             foreach ($children as $i) {
-                if (!Util::doesInherit($i, $propDomain)) {
+                if (!$this->doesInherit($i, $propDomain)) {
                     echo $verbose ? "restriction for class " . $i->getUri() . " and property " . $prop->getUri() . " - the class is not a subclass of property's domain (" . $propDomain->getUri() . ")\n" : '';
                     return false;
                 }
             }
-            
+
             $simplify = count($this->res->allResources(RDF::OWL_ON_CLASS)) + count($this->res->allResources(RDF::OWL_ON_DATA_RANGE));
             if ($simplify) {
                 echo $verbose ? "restriction " . $this->res->getUri() . " for class " . $i->getUri() . " and property " . $prop->getUri() . " is a qualified one\n" : '';
@@ -127,5 +128,19 @@ class Restriction extends Entity {
 
     public function getId(): string {
         return $this->id;
+    }
+
+    /**
+     * Checks if $what inherits from $from
+     */
+    private function doesInherit(Resource $what, Resource $from): bool {
+        if ($what === $from || in_array((string) $from, [RDF::OWL_THING, RDF::RDFS_LITERAL])) {
+            return true;
+        }
+        $flag = false;
+        foreach ($from->getGraph()->resourcesMatching(RDF::RDFS_SUB_CLASS_OF, $from) as $i) {
+            $flag |= self::doesInherit($what, $i);
+        }
+        return (bool) $flag;
     }
 }

@@ -31,12 +31,16 @@ use EasyRdf\Graph;
 use EasyRdf\Literal;
 use EasyRdf\Resource;
 use GuzzleHttp\Exception\RequestException;
+use GuzzleHttp\Promise\RejectedPromise;
 use acdhOeaw\arche\lib\BinaryPayload;
 use acdhOeaw\arche\lib\Repo;
 use acdhOeaw\arche\lib\RepoResource;
 use acdhOeaw\arche\lib\SearchConfig;
 use acdhOeaw\arche\lib\SearchTerm;
 use acdhOeaw\arche\lib\exception\NotFound;
+use acdhOeaw\arche\lib\exception\RepoLibException;
+use acdhOeaw\arche\lib\ingest\SkosVocabulary as SV;
+use acdhOeaw\arche\lib\ingest\MetadataCollection as MC;
 use zozlak\RdfConstants as RDF;
 
 /**
@@ -105,8 +109,6 @@ class Ontology {
      * @return bool
      */
     public function check(string $propNmsp = ''): bool {
-        $n = strlen($propNmsp);
-
         $result = true;
         foreach ($this->ontology->allOfType(RDF::OWL_RESTRICTION) as $i) {
             $restriction = new Restriction($i, $this->schema);
@@ -123,13 +125,8 @@ class Ontology {
         return (bool) $result;
     }
 
-    /**
-     * 
-     * @param Repo $repo
-     * @param bool $verbose
-     * @return void
-     */
-    public function import(Repo $repo, bool $verbose = false): void {
+    public function import(Repo $repo, bool $verbose = false,
+                           int $concurrency = 3): void {
         echo $verbose ? "### Creating top-level collections\n" : '';
 
         $collections = array_merge([$this->schema->namespaces->ontology . 'ontology'], self::$collections);
@@ -138,9 +135,9 @@ class Ontology {
         }
 
         $ids      = [];
-        $imported = [];
+        $toImport = new MC($repo, null);
+        echo $verbose ? "### Preparring ontology for ingestion\n" : '';
         foreach ($collections as $type) {
-            echo $verbose ? "### Importing $type\n" : '';
             foreach ($this->ontology->allOfType($type) as $i) {
                 switch ($type) {
                     case RDF::OWL_RESTRICTION:
@@ -158,28 +155,34 @@ class Ontology {
                         break;
                 }
                 $import = $entity->check($verbose); // the check method may alter the $i RDF resource
-                $id     = $entity->getId();
-                if (preg_match('/^_:genid[0-9]+$/', $id)) {
-                    echo $verbose ? "Skipping an anonymous resource \n" . $i->dump('text') : '';
-                    $import = false;
-                }
-                if (in_array($id, $ids)) {
-                    echo $verbose ? "Skipping a duplicated resource \n" . $i->dump('text') : '';
-                    $import = false;
-                }
-                $ids[] = $id;
-                if ($import === true) {
-                    $meta       = $this->sanitizeOwlObject($i, $id, $type);
-                    $repoRes    = Util::updateOrCreate($repo, $id, $meta, $verbose);
-                    $imported[] = $repoRes->getUri();
+                if ($import) {
+                    $id = $entity->getId();
+                    if (preg_match('/^_:genid[0-9]+$/', $id)) {
+                        echo $verbose ? "Skipping an anonymous resource \n" . $i->dump('text') : '';
+                        continue;
+                    }
+                    if (in_array($id, $ids)) {
+                        echo $verbose ? "Skipping a duplicated resource \n" . $i->dump('text') : '';
+                        continue;
+                    }
+                    $ids[] = $id;
+                    $meta  = $this->sanitizeOwlObject($i, $id, $type);
+                    $meta->copy([], '/^$/', '', $toImport);
                 }
             }
         }
 
+        echo $verbose ? "### Ingesting the ontology\n" : '';
+        $debug     = SV::$debug;
+        MC::$debug = $verbose ? 2 : 1;
+        $imported  = $toImport->import('', MC::SKIP, MC::ERRMODE_FAIL, $concurrency, $concurrency);
+        $imported  = array_map(fn($x) => $x->getUri(), $imported);
+        MC::$debug = $debug;
+
         echo $verbose ? "### Removing obsolete resources...\n" : '';
         array_shift($collections);
         foreach (self::$collections as $id) {
-            Util::removeObsoleteChildren($repo, $id, $this->schema->parent, $imported, $verbose);
+            $this->removeObsoleteChildren($repo, $id, $this->schema->parent, $imported, $verbose, $concurrency, $concurrency);
         }
     }
 
@@ -188,10 +191,14 @@ class Ontology {
      * @param Repo $repo
      * @param string $owlPath
      * @param bool $verbose
+     * @param Resource|null $collectionMeta
+     * @param Resource|null $resourceMeta
      * @return void
      * @throws RuntimeException
      */
-    public function importOwlFile(Repo $repo, string $owlPath, bool $verbose): void {
+    public function importOwlFile(Repo $repo, string $owlPath, bool $verbose,
+                                  ?Resource $collectionMeta = null,
+                                  ?Resource $resourceMeta = null): void {
         $s = $this->schema;
 
         echo $verbose ? "###  Updating the owl binary\n" : '';
@@ -199,11 +206,22 @@ class Ontology {
         // collection storing all ontology binaries
         $collId = $s->namespaces->id . 'acdh-schema';
         try {
+            /** @var RepoResource $coll */
             $coll = $repo->getResourceById($collId);
+            if ($collectionMeta !== null) {
+                $coll->setMetadata($collectionMeta);
+                $coll->updateMetadata();
+            }
         } catch (NotFound $e) {
-            $meta = (new Graph())->resource('.');
+            $meta = $collectionMeta;
+            if ($meta === null) {
+                $meta = (new Graph())->resource('.');
+            }
+            $meta = $meta->resource('.');
             $meta->addResource($s->id, $collId);
-            $meta->addLiteral($s->label, new Literal('ACDH ontology binaries', 'en'));
+            if (null === $meta->getLiteral($s->label)) {
+                $meta->addLiteral($s->label, new Literal('ACDH ontology binaries', 'en'));
+            }
             $coll = $repo->createResource($meta);
         }
         echo $verbose ? "    " . $coll->getUri() . "\n" : '';
@@ -211,11 +229,15 @@ class Ontology {
         $curId = preg_replace('/#$/', '', $this->schema->namespaces->ontology);
         $old   = null;
 
-        $newMeta = (new Graph())->resource('.');
+        $newMeta = $resourceMeta;
+        if ($newMeta === null) {
+            $newMeta = (new Graph())->resource('.');
+        }
         $newMeta->addResource($s->id, $curId . '/' . date('Y-m-d_H:m:s'));
-        $newMeta->addLiteral($s->label, new Literal('ACDH schema owl file', 'en'));
         $newMeta->addResource($s->parent, $coll->getUri());
-        $newMeta->addResource($s->accessRestriction, 'https://vocabs.acdh.oeaw.ac.at/archeaccessrestrictions/public');
+        if (null === $newMeta->getLiteral($s->label)) {
+            $newMeta->addLiteral($s->label, new Literal('ACDH schema owl file', 'en'));
+        }
 
         $binary = new BinaryPayload(null, $owlPath, 'application/rdf+xml');
         try {
@@ -242,6 +264,11 @@ class Ontology {
                 $new->updateMetadata();
             } else {
                 echo $verbose ? "    owl binary up to date\n" : '';
+                if ($resourceMeta !== null) {
+                    echo $verbose ? "    updating owl binary metadata " . $old->getUri() . "\n" : '';
+                    $old->setMetadata($newMeta);
+                    $old->updateMetadata();
+                }
             }
         } catch (NotFound $e) {
             echo $verbose ? "    no owl binary - creating\n" : '';
@@ -251,30 +278,35 @@ class Ontology {
         }
     }
 
-    /**
-     * 
-     * @param Repo $repo
-     * @param bool $verbose
-     * @param bool $manageTransactions
-     * @return void
-     */
     public function importVocabularies(Repo $repo, bool $verbose,
-                                       bool $manageTransactions): void {
+                                       bool $manageTransactions,
+                                       int $concurrency = 3, bool $force = false): void {
         echo $verbose ? "###  Importing external vocabularies\n" : '';
 
+        $debug           = SV::$debug;
+        SV::$debug       = $verbose ? 2 : 1;
         $touchCollection = false;
         $vocabsProp      = $this->schema->ontology->vocabs;
         foreach ($this->ontology->resourcesMatching($vocabsProp) as $res) {
             foreach ($res->all($vocabsProp) as $vocabularyUrl) {
                 $vocabularyUrl = (string) $vocabularyUrl;
                 echo $verbose ? "$vocabularyUrl\n" : '';
-                $vocabulary    = new Vocabulary($this->schema);
                 try {
-                    $vocabulary->loadUrl($vocabularyUrl);
+                    $vocabulary = SV::fromUrl($repo, $vocabularyUrl)
+                        ->setExactMatchMode(SV::EXACTMATCH_MERGE, SV::EXACTMATCH_MERGE)
+                        ->setSkosRelationsMode(SV::RELATIONS_KEEP, SV::RELATIONS_DROP);
+                    if ($force) {
+                        $vocabulary->forceUpdate();
+                    } elseif ($vocabulary->getState() === SV::STATE_OK) {
+                        continue;
+                    }
+                    $vocabulary->preprocess();
                     if ($manageTransactions) {
                         $repo->begin();
                     }
-                    $touchCollection |= $vocabulary->update($repo, $verbose);
+                    $imported        = $vocabulary->import('', MC::SKIP, MC::ERRMODE_FAIL, $concurrency, $concurrency);
+                    $touchCollection |= count($imported) > 0;
+                    unset($imported);
                     if ($manageTransactions) {
                         $repo->commit();
                     }
@@ -283,6 +315,7 @@ class Ontology {
                 }
             }
         }
+        SV::$debug = $debug;
 
         if ($touchCollection) {
             echo $verbose ? "Updating class collection timestamp\n" : '';
@@ -305,8 +338,6 @@ class Ontology {
     private function createCollection(Repo $repo, string $id): void {
         try {
             $res = $repo->getResourceById($id);
-            $res->setMetadata($res->getMetadata());
-            $res->updateMetadata();
         } catch (NotFound $e) {
             $meta = (new Graph())->resource('.');
             $meta->addLiteral($this->schema->label, new Literal((string) preg_replace('|^.*[/#]|', '', $id), 'en'));
@@ -325,8 +356,9 @@ class Ontology {
      *   resource should be created
      * @return \EasyRdf\Resource URL of a created/updated repository resource
      */
-    function sanitizeOwlObject(Resource $res, string $id, string $parentId): Resource {
-        $meta = (new Graph())->resource('.');
+    private function sanitizeOwlObject(Resource $res, string $id,
+                                       string $parentId): Resource {
+        $meta = (new Graph())->resource($res->getUri());
         foreach ($res->propertyUris() as $p) {
             foreach ($res->allLiterals($p) as $v) {
                 if ($v->getValue() !== '') {
@@ -348,5 +380,51 @@ class Ontology {
         }
 
         return $meta;
+    }
+
+    /**
+     * 
+     * @param Repo $repo
+     * @param string $collectionId
+     * @param string $parentProp
+     * @param array<string> $imported
+     * @param bool $verbose
+     * @param int $concurrency
+     * @return void
+     */
+    private function removeObsoleteChildren(Repo $repo, string $collectionId,
+                                            string $parentProp, array $imported,
+                                            bool $verbose, int $concurrency = 3): void {
+        $searchTerm              = new SearchTerm($parentProp, $collectionId, '=', SearchTerm::TYPE_RELATION);
+        $searchCfg               = new SearchConfig();
+        $searchCfg->metadataMode = RepoResource::META_RESOURCE;
+        $children                = $repo->getResourcesBySearchTerms([$searchTerm], $searchCfg);
+        foreach ($children as $res) {
+            $retries = $concurrency;
+            /** @var RepoResource $res */
+            $toDel   = [];
+            if (!in_array($res->getUri(), $imported)) {
+                $toDel[] = $res;
+            }
+            $f = function (RepoResource $res) use ($verbose) {
+                echo $verbose ? "    " . $res->getUri() . "\n" : '';
+                return $res->deleteAsync(true);
+            };
+            while ($retries > 0 && count($toDel) > 0) {
+                $results = $repo->map($toDel, $f, $concurrency, Repo::REJECT_FAIL);
+                $tmp     = [];
+                foreach ($results as $n => $i) {
+                    if ($i instanceof RejectedPromise) {
+                        $tmp[] = $toDel[$n];
+                    }
+                }
+                $toDel = $tmp;
+                $retries--;
+            }
+
+            if (count($toDel) > 0) {
+                throw new RepoLibException("Failed to remove all obsolete $collectionId children");
+            }
+        }
     }
 }
