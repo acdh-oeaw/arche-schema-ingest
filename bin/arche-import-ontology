@@ -36,7 +36,6 @@ $args->addArgument('--pswd', help: 'Repository user password');
 $args->addArgument('--concurrency', type: AP::TYPE_INT, default: 3);
 $args->addArgument('--verbose', action: 'store_true');
 $args->addArgument('--skipBinary', action: 'store_true');
-$args->addArgument('--skipVocabularies', action: 'store_true');
 $args->addArgument('--ontologyFile', help: 'OWL file to read list of vocabularies from. If not provided, an ontology file from the currently installed acdh-oeaw/arche-schema composer library will be used.');
 $args->addArgument('--ontologyVersion', help: 'Onotology version. Use only when --ontologyFile is provided.');
 $args->addArgument('--ontologyUrl', help: 'Onotology version URL. Use only when --ontologyFile is provided.');
@@ -75,10 +74,6 @@ try {
         $ontology->importOwlFile($repo, $ontologyFile, $args->verbose, $collMeta, $ontologyMeta);
     }
     $repo->commit();
-
-    if (!$args->skipVocabularies) {
-        $ontology->importVocabularies($repo, $args->verbose, true, $args->concurrency);
-    }
 } finally {
     if ($repo->inTransaction()) {
         $repo->rollback();

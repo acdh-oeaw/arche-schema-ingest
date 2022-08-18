@@ -277,55 +277,20 @@ class Ontology {
         }
     }
 
-    public function importVocabularies(Repo $repo, bool $verbose,
-                                       bool $manageTransactions,
-                                       int $concurrency = 3, bool $force = false): void {
-        echo $verbose ? "###  Importing external vocabularies\n" : '';
-
-        $debug           = SV::$debug;
-        SV::$debug       = $verbose ? 2 : 1;
-        $touchCollection = false;
-        $vocabsProp      = $this->schema->ontology->vocabs;
+    /**
+     * Returns an array of vocabulary URIs used by the ontology
+     * 
+     * @return array<string>
+     */
+    public function getVocabularies(): array {
+        $vocabsProp = $this->schema->ontology->vocabs;
+        $vocabs     = [];
         foreach ($this->ontology->resourcesMatching($vocabsProp) as $res) {
-            foreach ($res->all($vocabsProp) as $vocabularyUrl) {
-                $vocabularyUrl = (string) $vocabularyUrl;
-                echo $verbose ? "$vocabularyUrl\n" : '';
-                try {
-                    $vocabulary = SV::fromUrl($repo, $vocabularyUrl)
-                        ->setExactMatchMode(SV::EXACTMATCH_MERGE, SV::EXACTMATCH_MERGE)
-                        ->setSkosRelationsMode(SV::RELATIONS_KEEP, SV::RELATIONS_DROP);
-                    if ($force) {
-                        $vocabulary->forceUpdate();
-                    } elseif ($vocabulary->getState() === SV::STATE_OK) {
-                        continue;
-                    }
-                    $vocabulary->preprocess();
-                    if ($manageTransactions) {
-                        $repo->begin();
-                    }
-                    $imported        = $vocabulary->import('', MC::SKIP, MC::ERRMODE_FAIL, $concurrency, $concurrency);
-                    $touchCollection |= count($imported) > 0;
-                    unset($imported);
-                    if ($manageTransactions) {
-                        $repo->commit();
-                    }
-                } catch (RequestException $e) {
-                    echo $verbose ? "    fetch error" . $e->getMessage() . "\n" : '';
-                }
+            foreach ($res->all($vocabsProp) as $i) {
+                $vocabs[] = (string) $i;
             }
         }
-        SV::$debug = $debug;
-
-        if ($touchCollection) {
-            echo $verbose ? "Updating class collection timestamp\n" : '';
-            if ($manageTransactions) {
-                $repo->begin();
-            }
-            $this->createCollection($repo, RDF::OWL_CLASS);
-            if ($manageTransactions) {
-                $repo->commit();
-            }
-        }
+        return $vocabs;
     }
 
     /**

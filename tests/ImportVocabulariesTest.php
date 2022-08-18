@@ -26,6 +26,8 @@
 
 namespace acdhOeaw\arche\schemaImport\tests;
 
+use zozlak\RdfConstants as RDF;
+
 /**
  * Description of IndexerTest
  *
@@ -33,13 +35,21 @@ namespace acdhOeaw\arche\schemaImport\tests;
  */
 class ImportVocabulariesTest extends \PHPUnit\Framework\TestCase {
 
+    static public function setUpBeforeClass(): void {
+        exec("docker exec -u www-data arche bash -c \"echo 'truncate resources cascade;' | psql\" 2>&1 > /dev/null");
+    }
+
+    static public function tearDownAfterClass(): void {
+        exec("docker exec -u www-data arche bash -c \"echo 'truncate resources cascade;' | psql\"  2>&1 > /dev/null");
+    }
+
     public function testSimple(): void {
         $_SERVER['argv'] = [
             'test',
             '--user', 'admin',
             '--pswd', 'pswd',
             '--vocabularyLocation', 'https://vocabs.acdh.oeaw.ac.at/rest/v1/arche_category/data',
-            '--concurrency', '5',
+            '--concurrency', '6',
             '--force',
             'http://127.0.0.1/api',
         ];
@@ -53,9 +63,11 @@ class ImportVocabulariesTest extends \PHPUnit\Framework\TestCase {
             'test',
             '--user', 'admin',
             '--pswd', 'pswd',
-            '--concurrency', '5',
+            '--concurrency', '6',
             '--force',
+            '--ontologyFile', __DIR__ . '/../vendor/acdh-oeaw/arche-schema/acdh-schema.owl',
             'http://127.0.0.1/api',
+            '--allowedNmsp', RDF::NMSP_SKOS,
         ];
         require __DIR__ . '/../bin/arche-import-vocabularies';
         // as for now test just for no error

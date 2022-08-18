@@ -28,36 +28,60 @@
 require_once __DIR__ . "/loadComposer.php";
 
 use zozlak\argparse\ArgumentParser as AP;
+use zozlak\RdfConstants as RDF;
 use acdhOeaw\arche\lib\ingest\SkosVocabulary as SV;
 use acdhOeaw\arche\lib\ingest\MetadataCollection as MC;
 
-$args = new AP("Imports SKOS vocabularies into ARCHE.");
+$args      = new AP("Imports SKOS vocabularies into ARCHE.");
 $args->addArgument('--user', help: 'Repository user used to perform the ingestiton');
 $args->addArgument('--pswd', help: 'Repository user password');
 $args->addArgument('--concurrency', type: AP::TYPE_INT, default: 3);
 $args->addArgument('--verbose', action: 'store_true');
 $args->addArgument('--force', action: 'store_true');
+$args->addArgument('--allowedNmsp', nargs: AP::NARGS_STAR);
+$args->addArgument('--allowedObjectNmsp', nargs: AP::NARGS_STAR);
 $args->addArgument('--ontologyFile', help: 'OWL file to read list of vocabularies from. If not provided, the ontology is read from the repository.');
 $args->addArgument('--vocabularyLocation', help: "Explicit vocabulary dump URL or file. When provided, only a given vocabulary is imported and it doesn't matter if it's defined in the ontology or not. Takes precedence over --ontologyFile.");
 $args->addArgument('repositoryUrl', help: 'Repository base URL');
-$args = $args->parseArgs();
+$args      = $args->parseArgs();
+SV::$debug = $args->verbose ? 2 : 1;
 
 $t0     = time();
 $opts   = ['auth' => [$args->user, $args->pswd]];
 $repo   = acdhOeaw\arche\lib\Repo::factoryFromUrl($args->repositoryUrl, $opts);
 $schema = $repo->getSchema();
+
 if (!empty($args->vocabularyLocation)) {
-    if (file_exists($args->vocabularyLocation)) {
-        $vocabulary = new SV($repo, $args->vocabularyLocation);
+    $locations = [$args->vocabularyLocation];
+} else {
+    $ontology = new acdhOeaw\arche\schemaImport\Ontology($schema);
+    if (!empty($args->ontologyFile)) {
+        $ontology->loadFile($args->ontologyFile);
     } else {
-        $vocabulary = SV::fromUrl($repo, $args->vocabularyLocation);
+        $ontology->loadRepo($repo);
+    }
+    $locations = $ontology->getVocabularies();
+}
+
+foreach ($locations as $location) {
+    if (file_exists($location)) {
+        $vocabulary = new SV($repo, $location);
+    } else {
+        $vocabulary = SV::fromUrl($repo, $location);
     }
     if ($args->force || $vocabulary->getState() !== SV::STATE_OK) {
-        SV::$debug = $args->verbose ? 2 : 1;
         $vocabulary
             ->setExactMatchMode(SV::EXACTMATCH_MERGE, SV::EXACTMATCH_MERGE)
             ->setSkosRelationsMode(SV::RELATIONS_KEEP, SV::RELATIONS_DROP)
+            ->setTitleProperties([RDF::SKOS_PREF_LABEL, RDF::SKOS_ALT_LABEL,
+                RDF::RDFS_LABEL, RDF::NMSP_DC . "title"])
             ->forceUpdate();
+        if (count($args->allowedNmsp ?? []) > 0) {
+            $vocabulary->setAllowedNamespaces($args->allowedNmsp);
+        }
+        if (count($args->allowedObjectNmsp ?? []) > 0) {
+            $vocabulary->setAllowedResourceNamespaces($args->allowedObjectNmsp);
+        }
         $vocabulary->preprocess();
         try {
             $repo->begin();
@@ -67,20 +91,6 @@ if (!empty($args->vocabularyLocation)) {
             if ($repo->inTransaction()) {
                 $repo->rollback();
             }
-        }
-    }
-} else {
-    $ontology = new acdhOeaw\arche\schemaImport\Ontology($schema);
-    if (!empty($args->ontologyFile)) {
-        $ontology->loadFile($args->ontologyFile);
-    } else {
-        $ontology->loadRepo($repo);
-    }
-    try {
-        $ontology->importVocabularies($repo, $args->verbose, true, $args->concurrency, $args->force);
-    } finally {
-        if ($repo->inTransaction()) {
-            $repo->rollback();
         }
     }
 }

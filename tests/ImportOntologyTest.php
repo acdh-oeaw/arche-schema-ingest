@@ -33,25 +33,32 @@ namespace acdhOeaw\arche\schemaImport\tests;
  */
 class ImportOntologyTest extends \PHPUnit\Framework\TestCase {
 
-    public function testSimple(): void {
+    static public function setUpBeforeClass(): void {
+        exec("docker exec -u www-data arche bash -c \"echo 'truncate resources cascade;' | psql\" 2>&1 > /dev/null");
+    }
+
+    static public function tearDownAfterClass(): void {
+        exec("docker exec -u www-data arche bash -c \"echo 'truncate resources cascade;' | psql\"  2>&1 > /dev/null");
+    }
+    
+    public function testPackage(): void {
         $_SERVER['argv'] = [
             'test',
             '--user', 'admin',
             '--pswd', 'pswd',
-            '--concurrency', '5',
-            '--skipVocabularies',
+            '--concurrency', '6',
             'http://127.0.0.1/api'
         ];
         require __DIR__ . '/../bin/arche-import-ontology';
         $this->assertTrue(true);
     }
 
-    public function testFull(): void {
+    public function testFile(): void {
         $_SERVER['argv'] = [
             'test',
             '--user', 'admin',
             '--pswd', 'pswd',
-            '--concurrency', '5',
+            '--concurrency', '6',
             '--ontologyFile', __DIR__ . '/../vendor/acdh-oeaw/arche-schema/acdh-schema.owl',
             '--ontologyVersion', '99.0.0',
             '--ontologyUrl', 'https://github.com/acdh-oeaw/arche-schema',
