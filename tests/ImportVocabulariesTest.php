@@ -41,6 +41,9 @@ class ImportVocabulariesTest extends \PHPUnit\Framework\TestCase {
 
     static public function tearDownAfterClass(): void {
         exec("docker exec -u www-data arche bash -c \"echo 'truncate resources cascade;' | psql\"  2>&1 > /dev/null");
+        if (file_exists('tmp.owl')) {
+            unlink('tmp.owl');
+        }
     }
 
     public function testSimple(): void {
@@ -59,13 +62,16 @@ class ImportVocabulariesTest extends \PHPUnit\Framework\TestCase {
     }
 
     public function testFull(): void {
+        $tmp             = explode("\n", file_get_contents(__DIR__ . '/../vendor/acdh-oeaw/arche-schema/acdh-schema.owl'));
+        $tmp             = array_filter($tmp, fn($x) => !preg_match('`v1/iso639_3|v1/oefos`', $x));
+        file_put_contents('tmp.owl', implode("\n", $tmp));
         $_SERVER['argv'] = [
             'test',
             '--user', 'admin',
             '--pswd', 'pswd',
             '--concurrency', '6',
             '--force',
-            '--ontologyFile', __DIR__ . '/../vendor/acdh-oeaw/arche-schema/acdh-schema.owl',
+            '--ontologyFile', 'tmp.owl',
             'http://127.0.0.1/api',
             '--allowedNmsp', RDF::NMSP_SKOS,
         ];
