@@ -27,7 +27,6 @@
 
 require_once __DIR__ . "/loadComposer.php";
 
-use Throwable;
 use GuzzleHttp\Exception\ClientException;
 use zozlak\argparse\ArgumentParser as AP;
 use zozlak\RdfConstants as RDF;
