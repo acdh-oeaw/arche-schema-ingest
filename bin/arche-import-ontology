@@ -34,6 +34,7 @@ $args = new AP("Imports an OWL ontology into the ARCHE repository.");
 $args->addArgument('--user', help: 'Repository user used to perform the ingestiton');
 $args->addArgument('--pswd', help: 'Repository user password');
 $args->addArgument('--concurrency', type: AP::TYPE_INT, default: 3);
+$args->addArgument('--force', action: 'store_true');
 $args->addArgument('--verbose', action: 'store_true');
 $args->addArgument('--ontologyFile', help: 'OWL file to read list of vocabularies from. If not provided, an ontology file from the currently installed acdh-oeaw/arche-schema composer library will be used.');
 $args->addArgument('--ontologyVersion', help: 'Onotology version. Use only when --ontologyFile is provided.');
@@ -69,7 +70,7 @@ try {
     }
     $repo->begin();
     $outdated = $ontology->importOwlFile($repo, $ontologyFile, $args->verbose, $collMeta, $ontologyMeta);
-    if ($outdated) {
+    if ($outdated || $args->force) {
         $ontology->import($repo, $args->verbose, $args->concurrency);
     }
     $repo->commit();
