@@ -27,6 +27,8 @@
 
 require_once __DIR__ . "/loadComposer.php";
 
+use Throwable;
+use GuzzleHttp\Exception\ClientException;
 use zozlak\argparse\ArgumentParser as AP;
 use zozlak\RdfConstants as RDF;
 use acdhOeaw\arche\lib\ingest\SkosVocabulary as SV;
@@ -87,14 +89,18 @@ foreach ($locations as $location) {
             $repo->begin();
             $vocabulary->import('', MC::SKIP, MC::ERRMODE_FAIL, $args->concurrency, $args->concurrency);
             $repo->commit();
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             echo $e->getMessage();
             if ($args->verbose) {
                 echo $e->getTraceAsString();
             }
         } finally {
             if ($repo->inTransaction()) {
-                $repo->rollback();
+                try {
+                    $repo->rollback();
+                } catch (ClientException $e) {
+                    
+                }
             }
         }
     }
