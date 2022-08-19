@@ -33,7 +33,8 @@ use zozlak\RdfConstants as RDF;
 use acdhOeaw\arche\lib\ingest\SkosVocabulary as SV;
 use acdhOeaw\arche\lib\ingest\MetadataCollection as MC;
 
-$args      = new AP("Imports SKOS vocabularies into ARCHE.");
+$relationsModes = [SV::RELATIONS_DROP, SV::RELATIONS_KEEP, SV::RELATIONS_LITERAL];
+$args           = new AP("Imports SKOS vocabularies into ARCHE.");
 $args->addArgument('--user', help: 'Repository user used to perform the ingestiton');
 $args->addArgument('--pswd', help: 'Repository user password');
 $args->addArgument('--concurrency', type: AP::TYPE_INT, default: 3);
@@ -43,11 +44,12 @@ $args->addArgument('--allowedNmsp', nargs: AP::NARGS_STAR);
 $args->addArgument('--allowedObjectNmsp', nargs: AP::NARGS_STAR);
 $args->addArgument('--makePublic', action: 'store_true');
 $args->addArgument('--dropHasTopConcept', action: 'store_true');
+$args->addArgument('--relationsMode', choices: $relationsModes, default: SV::RELATIONS_DROP, help: 'How to handle SKOS relations pointing outside of the vocabulary');
 $args->addArgument('--ontologyFile', help: 'OWL file to read list of vocabularies from. If not provided, the ontology is read from the repository.');
 $args->addArgument('--vocabularyLocation', help: "Explicit vocabulary dump URL or file. When provided, only a given vocabulary is imported and it doesn't matter if it's defined in the ontology or not. Takes precedence over --ontologyFile.");
 $args->addArgument('repositoryUrl', help: 'Repository base URL');
-$args      = $args->parseArgs();
-SV::$debug = $args->verbose ? 2 : 1;
+$args           = $args->parseArgs();
+SV::$debug      = $args->verbose ? 2 : 1;
 
 $t0     = time();
 $opts   = ['auth' => [$args->user, $args->pswd]];
@@ -75,7 +77,7 @@ foreach ($locations as $location) {
     if ($args->force || $vocabulary->getState() !== SV::STATE_OK) {
         $vocabulary
             ->setExactMatchMode(SV::EXACTMATCH_MERGE, SV::EXACTMATCH_MERGE)
-            ->setSkosRelationsMode(SV::RELATIONS_KEEP, SV::RELATIONS_DROP)
+            ->setSkosRelationsMode(SV::RELATIONS_KEEP, $args->relationsMode)
             ->setTitleProperties([RDF::SKOS_PREF_LABEL, RDF::SKOS_ALT_LABEL,
                 RDF::RDFS_LABEL, RDF::NMSP_DC . "title"])
             ->forceUpdate();
@@ -89,7 +91,7 @@ foreach ($locations as $location) {
 
         // extra postprocessing
         $conceptSchema = $vocabulary->allOfType(RDF::SKOS_CONCEPT_SCHEMA)[0];
-        $accessProp = $repo->getSchema()->accessRestriction ?? '';
+        $accessProp    = $repo->getSchema()->accessRestriction ?? '';
         if ($args->makePublic && !empty($accessProp)) {
             echo "Adding $accessProp https://vocabs.acdh.oeaw.ac.at/archeaccessrestrictions/public\n";
             $conceptSchema->addResource($accessProp, 'https://vocabs.acdh.oeaw.ac.at/archeaccessrestrictions/public');
@@ -98,7 +100,7 @@ foreach ($locations as $location) {
             echo "Removing skos:hasTopConcept\n";
             $conceptSchema->delete(RDF::SKOS_HAS_TOP_CONCEPT);
         }
-        
+
         // ingestion
         try {
             $repo->begin();
