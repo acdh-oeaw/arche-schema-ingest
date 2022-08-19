@@ -193,12 +193,12 @@ class Ontology {
      * @param bool $verbose
      * @param Resource|null $collectionMeta
      * @param Resource|null $resourceMeta
-     * @return void
+     * @return bool if owl file has been uploaded
      * @throws RuntimeException
      */
     public function importOwlFile(Repo $repo, string $owlPath, bool $verbose,
                                   ?Resource $collectionMeta = null,
-                                  ?Resource $resourceMeta = null): void {
+                                  ?Resource $resourceMeta = null): true {
         $s = $this->schema;
 
         echo $verbose ? "###  Updating the owl binary\n" : '';
@@ -238,6 +238,7 @@ class Ontology {
             $newMeta->addLiteral($s->label, new Literal('ACDH schema owl file', 'en'));
         }
 
+        $updated = true;
         $binary = new BinaryPayload(null, $owlPath, 'application/rdf+xml');
         try {
             $old = $repo->getResourceById($curId);
@@ -268,6 +269,7 @@ class Ontology {
                     $old->setMetadata($newMeta);
                     $old->updateMetadata();
                 }
+                $updated = false;
             }
         } catch (NotFound $e) {
             echo $verbose ? "    no owl binary - creating\n" : '';
@@ -275,6 +277,7 @@ class Ontology {
             $new = $repo->createResource($newMeta, $binary);
             echo $verbose ? "      " . $new->getUri() . "\n" : '';
         }
+        return $updated;
     }
 
     /**
