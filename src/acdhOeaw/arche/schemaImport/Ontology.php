@@ -176,13 +176,13 @@ class Ontology {
         $debug     = SV::$debug;
         MC::$debug = $verbose ? 2 : 1;
         $imported  = $toImport->import('', MC::SKIP, MC::ERRMODE_FAIL, $concurrency, $concurrency);
-        $imported  = array_map(fn($x) => $x->getUri(), $imported);
+        $imported  = array_map(fn($x) => $x instanceof RepoResource ? $x->getUri() : '', $imported);
         MC::$debug = $debug;
 
         echo $verbose ? "### Removing obsolete resources...\n" : '';
         array_shift($collections);
         foreach (self::$collections as $id) {
-            $this->removeObsoleteChildren($repo, $id, $this->schema->parent, $imported, $verbose, $concurrency, $concurrency);
+            $this->removeObsoleteChildren($repo, $id, $this->schema->parent, $imported, $verbose, $concurrency);
         }
     }
 
@@ -239,8 +239,9 @@ class Ontology {
         }
 
         $updated = true;
-        $binary = new BinaryPayload(null, $owlPath, 'application/rdf+xml');
+        $binary  = new BinaryPayload(null, $owlPath, 'application/rdf+xml');
         try {
+            /** @var RepoResource $old */
             $old = $repo->getResourceById($curId);
 
             $hash = (string) $old->getGraph()->getLiteral($s->hash);

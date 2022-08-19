@@ -26,6 +26,7 @@
 
 namespace acdhOeaw\arche\schemaImport;
 
+use RuntimeException;
 use EasyRdf\Graph;
 use EasyRdf\Resource;
 use EasyRdf\Literal;
@@ -48,7 +49,7 @@ class Metadata {
                 return $res;
             }
         }
-        throw RuntimeException("No valid graph node found");
+        throw new RuntimeException("No valid graph node found");
     }
 
     static public function enrichFromArgs(Resource $meta, object $schema,
@@ -74,13 +75,13 @@ class Metadata {
         $meta->addLiteral($schema->version, $version);
 
         $dir         = \Composer\InstalledVersions::getInstallPath($package);
-        $packageMeta = json_decode(file_get_contents("$dir/composer.json"));
+        $packageMeta = json_decode((string) file_get_contents("$dir/composer.json"));
         if ($packageMeta->homepage ?? false) {
             $baseUrl = $packageMeta->homepage;
             $meta->addLiteral($schema->url, new Literal("$baseUrl/releases/$version", null, RDF::XSD_ANY_URI));
         }
 
-        $repoPath = explode('/', $baseUrl);
+        $repoPath = explode('/', $baseUrl ?? '');
         $repoPath = implode('/', array_slice($repoPath, count($repoPath) - 2));
         $client   = new Client(['http_errors' => false]);
         $headers  = ['Accept' => 'application/json'];
