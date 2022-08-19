@@ -87,6 +87,11 @@ foreach ($locations as $location) {
             $repo->begin();
             $vocabulary->import('', MC::SKIP, MC::ERRMODE_FAIL, $args->concurrency, $args->concurrency);
             $repo->commit();
+        } catch (\Throwable $e) {
+            echo $e->getMessage();
+            if ($args->verbose) {
+                echo $e->getTraceAsString();
+            }
         } finally {
             if ($repo->inTransaction()) {
                 $repo->rollback();
