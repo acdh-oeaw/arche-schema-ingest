@@ -20,11 +20,12 @@
         }
     },
     "require": {
-        "php": ">= 8",
+        "php": ">= 8 <8.2",
         "guzzlehttp/guzzle": "^7",
         "acdh-oeaw/easyrdf": "*",
         "acdh-oeaw/arche-schema": "*",
         "acdh-oeaw/arche-lib-ingest": "^3.3.4",
+        "acdh-oeaw/arche-lib": "^5.1.4",
         "zozlak/rdf-constants": "^1.2.1",
         "zozlak/argparse": "^1.0",
         "composer-runtime-api": "^2.1"

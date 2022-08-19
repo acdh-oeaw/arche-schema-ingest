@@ -95,7 +95,7 @@ class Metadata {
                 $meta->addLiteral($schema->infor, new Literal(trim($data->body), 'und'));
             }
         }
-        
+
         return "$dir/acdh-schema.owl";
     }
 }

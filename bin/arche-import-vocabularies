@@ -123,6 +123,7 @@ foreach ($locations as $location) {
                 }
             }
         }
+        echo "-----\n";
     }
 }
 
