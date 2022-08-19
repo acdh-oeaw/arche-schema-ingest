@@ -41,6 +41,8 @@ $args->addArgument('--verbose', action: 'store_true');
 $args->addArgument('--force', action: 'store_true');
 $args->addArgument('--allowedNmsp', nargs: AP::NARGS_STAR);
 $args->addArgument('--allowedObjectNmsp', nargs: AP::NARGS_STAR);
+$args->addArgument('--makePublic', action: 'store_true');
+$args->addArgument('--dropHasTopConcept', action: 'store_true');
 $args->addArgument('--ontologyFile', help: 'OWL file to read list of vocabularies from. If not provided, the ontology is read from the repository.');
 $args->addArgument('--vocabularyLocation', help: "Explicit vocabulary dump URL or file. When provided, only a given vocabulary is imported and it doesn't matter if it's defined in the ontology or not. Takes precedence over --ontologyFile.");
 $args->addArgument('repositoryUrl', help: 'Repository base URL');
@@ -84,14 +86,31 @@ foreach ($locations as $location) {
             $vocabulary->setAllowedResourceNamespaces($args->allowedObjectNmsp);
         }
         $vocabulary->preprocess();
+
+        // extra postprocessing
+        $conceptSchema = $vocabulary->allOfType(RDF::SKOS_CONCEPT_SCHEMA)[0];
+        $accessProp = $repo->getSchema()->accessRestriction ?? '';
+        if ($args->makePublic && !empty($accessProp)) {
+            echo "Adding $accessProp https://vocabs.acdh.oeaw.ac.at/archeaccessrestrictions/public\n";
+            $conceptSchema->addResource($accessProp, 'https://vocabs.acdh.oeaw.ac.at/archeaccessrestrictions/public');
+        }
+        if ($args->dropHasTopConcept) {
+            echo "Removing skos:hasTopConcept\n";
+            $conceptSchema->delete(RDF::SKOS_HAS_TOP_CONCEPT);
+        }
+        
+        // ingestion
         try {
             $repo->begin();
             $vocabulary->import('', MC::SKIP, MC::ERRMODE_FAIL, $args->concurrency, $args->concurrency);
             $repo->commit();
         } catch (Throwable $e) {
-            echo $e->getMessage();
-            if ($args->verbose) {
-                echo $e->getTraceAsString();
+            $n = 1;
+            echo "ERROR:\n";
+            while ($e) {
+                echo "$n: " . $e->getMessage() . "\n";
+                $e = $e->getPrevious();
+                $n++;
             }
         } finally {
             if ($repo->inTransaction()) {
@@ -106,4 +125,3 @@ foreach ($locations as $location) {
 }
 
 echo "\nFinished in " . (time() - $t0) . "s\n";
-
