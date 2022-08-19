@@ -198,7 +198,7 @@ class Ontology {
      */
     public function importOwlFile(Repo $repo, string $owlPath, bool $verbose,
                                   ?Resource $collectionMeta = null,
-                                  ?Resource $resourceMeta = null): true {
+                                  ?Resource $resourceMeta = null): bool {
         $s = $this->schema;
 
         echo $verbose ? "###  Updating the owl binary\n" : '';
