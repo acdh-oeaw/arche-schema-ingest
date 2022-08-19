@@ -35,7 +35,6 @@ $args->addArgument('--user', help: 'Repository user used to perform the ingestit
 $args->addArgument('--pswd', help: 'Repository user password');
 $args->addArgument('--concurrency', type: AP::TYPE_INT, default: 3);
 $args->addArgument('--verbose', action: 'store_true');
-$args->addArgument('--skipBinary', action: 'store_true');
 $args->addArgument('--ontologyFile', help: 'OWL file to read list of vocabularies from. If not provided, an ontology file from the currently installed acdh-oeaw/arche-schema composer library will be used.');
 $args->addArgument('--ontologyVersion', help: 'Onotology version. Use only when --ontologyFile is provided.');
 $args->addArgument('--ontologyUrl', help: 'Onotology version URL. Use only when --ontologyFile is provided.');
@@ -57,21 +56,21 @@ if (empty($args->ontologyFile)) {
     $ontology->loadFile($args->ontologyFile);
 }
 try {
+    $collMeta     = $ontologyMeta = null;
+    $collMeta     = Metadata::fromFile("$ontologyPath/metadata/collection.ttl");
+    $ontologyMeta = Metadata::fromFile("$ontologyPath/metadata/resource.ttl");
+    if (empty($args->ontologyFile)) {
+        echo "Reading ontology metadata from composer and github\n";
+        $ontologyFile = Metadata::enrichFromComposer($ontologyMeta, $schema->ontology, 'acdh-oeaw/arche-schema');
+    } else {
+        echo "Creating ontology metadata from call parameters";
+        Metadata::enrichFromArgs($ontologyMeta, $schema->ontology, $args);
+        $ontologyFile = $args->ontologyFile;
+    }
     $repo->begin();
-    $ontology->import($repo, $args->verbose, $args->concurrency);
-    if (!$args->skipBinary) {
-        $collMeta     = $ontologyMeta = null;
-        $collMeta     = Metadata::fromFile("$ontologyPath/metadata/collection.ttl");
-        $ontologyMeta = Metadata::fromFile("$ontologyPath/metadata/resource.ttl");
-        if (empty($args->ontologyFile)) {
-            echo "Reading ontology metadata from composer and github\n";
-            $ontologyFile = Metadata::enrichFromComposer($ontologyMeta, $schema->ontology, 'acdh-oeaw/arche-schema');
-        } else {
-            echo "Creating ontology metadata from call parameters";
-            Metadata::enrichFromArgs($ontologyMeta, $schema->ontology, $args);
-            $ontologyFile = $args->ontologyFile;
-        }
-        $ontology->importOwlFile($repo, $ontologyFile, $args->verbose, $collMeta, $ontologyMeta);
+    $outdated = $ontology->importOwlFile($repo, $ontologyFile, $args->verbose, $collMeta, $ontologyMeta);
+    if ($outdated) {
+        $ontology->import($repo, $args->verbose, $args->concurrency);
     }
     $repo->commit();
 } finally {
