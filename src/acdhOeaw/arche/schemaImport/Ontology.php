@@ -315,7 +315,7 @@ class Ontology {
             }else{
                 $desc = "A technical collection for storing internal representation of ontology objects.";
             }
-            $meta->addResource($this->schema->ontology->description, new Literal($desc, 'en'));
+            $meta->addLiteral($this->schema->ontology->description, new Literal($desc, 'en'));
             $res  = $repo->createResource($meta);
         }
     }
