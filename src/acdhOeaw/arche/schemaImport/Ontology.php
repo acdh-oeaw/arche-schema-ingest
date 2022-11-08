@@ -129,15 +129,15 @@ class Ontology {
                            int $concurrency = 3): void {
         echo $verbose ? "### Creating top-level collections\n" : '';
 
-        $collections = array_merge([$this->schema->namespaces->ontology . 'ontology'], self::$collections);
-        foreach ($collections as $i => $id) {
-            $this->createCollection($repo, $id);
+        $topColl = $this->createCollection($repo, $this->schema->namespaces->ontology . 'ontology');
+        foreach (self::$collections as $id) {
+            $this->createCollection($repo, $id, $topColl);
         }
 
         $ids      = [];
         $toImport = new MC($repo, null);
-        echo $verbose ? "### Preparring ontology for ingestion\n" : '';
-        foreach ($collections as $type) {
+        echo $verbose ? "### Preparing ontology for ingestion\n" : '';
+        foreach (self::$collections as $type) {
             foreach ($this->ontology->allOfType($type) as $i) {
                 switch ($type) {
                     case RDF::OWL_RESTRICTION:
@@ -180,7 +180,6 @@ class Ontology {
         MC::$debug = $debug;
 
         echo $verbose ? "### Removing obsolete resources...\n" : '';
-        array_shift($collections);
         foreach (self::$collections as $id) {
             $this->removeObsoleteChildren($repo, $id, $this->schema->parent, $imported, $verbose, $concurrency);
         }
@@ -303,7 +302,8 @@ class Ontology {
      * @param string $id
      * @return void
      */
-    private function createCollection(Repo $repo, string $id): void {
+    private function createCollection(Repo $repo, string $id,
+                                      ?RepoResource $topColl = null): RepoResource {
         try {
             $res = $repo->getResourceById($id);
         } catch (NotFound $e) {
@@ -312,12 +312,16 @@ class Ontology {
             $meta->addResource($this->schema->id, $id);
             if (str_starts_with($id, 'http://www.w3.org/2002/07/owl#')) {
                 $desc = "A technical collection for storing internal representation of ontology objects of class $id.";
-            }else{
+            } else {
                 $desc = "A technical collection for storing internal representation of ontology objects.";
             }
             $meta->addLiteral($this->schema->ontology->description, new Literal($desc, 'en'));
-            $res  = $repo->createResource($meta);
+            if ($topColl !== null) {
+                $meta->addResource($this->schema->parent, $topColl->getUri());
+            }
+            $res = $repo->createResource($meta);
         }
+        return $res;
     }
 
     /**
