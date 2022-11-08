@@ -310,6 +310,12 @@ class Ontology {
             $meta = (new Graph())->resource('.');
             $meta->addLiteral($this->schema->label, new Literal((string) preg_replace('|^.*[/#]|', '', $id), 'en'));
             $meta->addResource($this->schema->id, $id);
+            if (str_starts_with($id, 'http://www.w3.org/2002/07/owl#')) {
+                $desc = "A technical collection for storing internal representation of ontology objects of class $id.";
+            }else{
+                $desc = "A technical collection for storing internal representation of ontology objects.";
+            }
+            $meta->addResource($this->schema->ontology->description, new Literal($desc, 'en'));
             $res  = $repo->createResource($meta);
         }
     }
