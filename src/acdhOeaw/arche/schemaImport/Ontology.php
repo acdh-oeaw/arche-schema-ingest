@@ -389,7 +389,7 @@ class Ontology {
                 return $res->deleteAsync(true);
             };
             while ($retries > 0 && count($toDel) > 0) {
-                $results = $repo->map($toDel, $f, $concurrency, Repo::REJECT_FAIL);
+                $results = $repo->map($toDel, $f, $concurrency, Repo::REJECT_INCLUDE);
                 $tmp     = [];
                 foreach ($results as $n => $i) {
                     if ($i instanceof RejectedPromise) {
