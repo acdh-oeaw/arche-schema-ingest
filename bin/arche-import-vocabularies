@@ -107,7 +107,7 @@ foreach ($locations as $location) {
             $vocabulary->import('', MC::SKIP, MC::ERRMODE_FAIL, $args->concurrency, $args->concurrency);
             $repo->commit();
         } catch (Throwable $e) {
-            acdhOeaw\arche\lib\exception\ExceptionUtil::unwrap($e) . "\n";
+            echo acdhOeaw\arche\lib\exception\ExceptionUtil::unwrap($e) . "\n";
         } finally {
             if ($repo->inTransaction()) {
                 try {
