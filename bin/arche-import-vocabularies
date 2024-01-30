@@ -98,9 +98,9 @@ foreach ($locations as $location) {
             echo "Adding $accessProp https://vocabs.acdh.oeaw.ac.at/archeaccessrestrictions/public\n";
             $vocabulary->add(DF::quad($conceptSchema, $accessProp, DF::namedNode('https://vocabs.acdh.oeaw.ac.at/archeaccessrestrictions/public')));
         }
-        if ($args->dropHasTopConcept && $conceptSchema !== null) {
+        if ($args->dropHasTopConcept) {
             echo "Removing skos:hasTopConcept\n";
-            $conceptSchema->delete(new PT(DF::namedNode(RDF::SKOS_HAS_TOP_CONCEPT)));
+            $vocabulary->delete(new PT(DF::namedNode(RDF::SKOS_HAS_TOP_CONCEPT)));
         }
 
         // ingestion
