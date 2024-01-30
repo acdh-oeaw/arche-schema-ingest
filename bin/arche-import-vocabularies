@@ -29,6 +29,8 @@ require_once __DIR__ . "/loadComposer.php";
 
 use GuzzleHttp\Exception\ClientException;
 use zozlak\argparse\ArgumentParser as AP;
+use quickRdf\DataFactory as DF;
+use termTemplates\PredicateTemplate as PT;
 use zozlak\RdfConstants as RDF;
 use acdhOeaw\arche\lib\ingest\SkosVocabulary as SV;
 use acdhOeaw\arche\lib\ingest\MetadataCollection as MC;
@@ -90,15 +92,15 @@ foreach ($locations as $location) {
         $vocabulary->preprocess();
 
         // extra postprocessing
-        $conceptSchema = $vocabulary->allOfType(RDF::SKOS_CONCEPT_SCHEMA)[0];
+        $conceptSchema = $vocabulary->getSubject(new PT(RDF::SKOS_CONCEPT_SCHEMA));
         $accessProp    = $repo->getSchema()->accessRestriction ?? '';
-        if ($args->makePublic && !empty($accessProp)) {
+        if ($args->makePublic && !empty($accessProp) && $conceptSchema !== null) {
             echo "Adding $accessProp https://vocabs.acdh.oeaw.ac.at/archeaccessrestrictions/public\n";
-            $conceptSchema->addResource($accessProp, 'https://vocabs.acdh.oeaw.ac.at/archeaccessrestrictions/public');
+            $vocabulary->add(DF::quad($conceptSchema, $accessProp, DF::namedNode('https://vocabs.acdh.oeaw.ac.at/archeaccessrestrictions/public')));
         }
         if ($args->dropHasTopConcept) {
             echo "Removing skos:hasTopConcept\n";
-            $conceptSchema->delete(RDF::SKOS_HAS_TOP_CONCEPT);
+            $conceptSchema->delete(new PT(DF::namedNode(RDF::SKOS_HAS_TOP_CONCEPT)));
         }
 
         // ingestion

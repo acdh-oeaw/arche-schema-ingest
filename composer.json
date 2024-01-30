@@ -20,18 +20,23 @@
         }
     },
     "require": {
-        "php": ">= 8 <8.2",
+        "php": ">= 8 <8.3",
         "guzzlehttp/guzzle": "^7",
-        "acdh-oeaw/easyrdf": "*",
         "acdh-oeaw/arche-schema": "*",
-        "acdh-oeaw/arche-lib-ingest": "^3.3.4",
-        "acdh-oeaw/arche-lib": "^5.1.4",
+        "acdh-oeaw/arche-lib-ingest": "dev-rdfInterface",
+        "acdh-oeaw/arche-lib": "dev-rdfInterface",
         "zozlak/rdf-constants": "^1.2.1",
         "zozlak/argparse": "^1.0",
-        "composer-runtime-api": "^2.1"
+        "composer-runtime-api": "^2.1",
+        "acdh-oeaw/uri-normalizer": "dev-master",
+        "sweetrdf/rdf-interface": "dev-master",
+        "sweetrdf/quick-rdf": "dev-master",
+        "sweetrdf/quick-rdf-io": "dev-master",
+        "sweetrdf/term-templates": "dev-dev",
+        "sweetrdf/rdf-helpers": "dev-dev"
     },
     "require-dev": {
-        "phpunit/phpunit": "^9",
+        "phpunit/phpunit": "^10",
         "phpstan/phpstan": "*"
     },
     "bin": [

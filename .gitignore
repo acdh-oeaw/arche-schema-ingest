@@ -6,3 +6,4 @@
 /log
 /build
 /.phpunit.result.cache
+/.phpunit.cache

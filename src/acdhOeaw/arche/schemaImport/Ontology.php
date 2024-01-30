@@ -27,16 +27,22 @@
 namespace acdhOeaw\arche\schemaImport;
 
 use RuntimeException;
-use EasyRdf\Graph;
-use EasyRdf\Literal;
-use EasyRdf\Resource;
-use GuzzleHttp\Exception\RequestException;
+use rdfInterface\NamedNodeInterface;
+use quickRdf\DataFactory as DF;
+use quickRdf\Dataset;
+use quickRdf\DatasetNode;
+use termTemplates\PredicateTemplate as PT;
+use termTemplates\LiteralTemplate;
+use termTemplates\NamedNodeTemplate;
+use termTemplates\AnyOfTemplate;
+use quickRdfIo\Util as RdfUtil;
 use GuzzleHttp\Promise\RejectedPromise;
 use acdhOeaw\arche\lib\BinaryPayload;
 use acdhOeaw\arche\lib\Repo;
 use acdhOeaw\arche\lib\RepoResource;
 use acdhOeaw\arche\lib\SearchConfig;
 use acdhOeaw\arche\lib\SearchTerm;
+use acdhOeaw\arche\lib\Schema;
 use acdhOeaw\arche\lib\exception\NotFound;
 use acdhOeaw\arche\lib\exception\RepoLibException;
 use acdhOeaw\arche\lib\ingest\SkosVocabulary as SV;
@@ -61,14 +67,10 @@ class Ontology {
         RDF::OWL_OBJECT_PROPERTY,
         RDF::OWL_DATATYPE_PROPERTY,
     ];
-    private Graph $ontology;
-    private object $schema;
+    private Dataset $ontology;
+    private Schema $schema;
 
-    /**
-     * 
-     * @param object $schema
-     */
-    public function __construct(object $schema) {
+    public function __construct(Schema $schema) {
         $this->schema = $schema;
     }
 
@@ -78,9 +80,9 @@ class Ontology {
      * @return void
      */
     public function loadFile(string $filename): void {
-        $this->ontology = new Graph();
-        $this->ontology->parseFile($filename);
-        $this->ontology->resource(RDF::OWL_THING)->addResource(RDF::RDF_TYPE, RDF::OWL_CLASS);
+        $this->ontology = new Dataset();
+        $this->ontology->add(RdfUtil::parse($filename, new DF(), 'application/rdf+xml'));
+        $this->ontology->add(DF::quad(DF::namedNode(RDF::OWL_THING), DF::namedNode(RDF::RDF_TYPE), DF::namedNode(RDF::OWL_CLASS)));
     }
 
     /**
@@ -89,7 +91,7 @@ class Ontology {
      * @return void
      */
     public function loadRepo(Repo $repo): void {
-        $this->ontology          = new Graph();
+        $this->ontology          = new Dataset();
         $searchTerm              = new SearchTerm($this->schema->parent, '', '=', SearchTerm::TYPE_RELATION);
         $searchCfg               = new SearchConfig();
         $searchCfg->metadataMode = RepoResource::META_RESOURCE;
@@ -97,29 +99,26 @@ class Ontology {
             $searchTerm->value = $i;
             $children          = $repo->getResourcesBySearchTerms([$searchTerm], $searchCfg);
             foreach ($children as $j) {
-                /* @var $j RepoResource */
-                $j->getGraph()->copy([], '/^$/', '', $this->ontology);
+                $this->ontology->add($j->getGraph());
             }
         }
     }
 
-    /**
-     * 
-     * @param string $propNmsp
-     * @return bool
-     */
-    public function check(string $propNmsp = ''): bool {
+    public function check(): bool {
         $result = true;
-        foreach ($this->ontology->allOfType(RDF::OWL_RESTRICTION) as $i) {
-            $restriction = new Restriction($i, $this->schema);
+        $tmpl   = new PT(DF::namedNode(RDF::RDF_TYPE));
+        foreach ($this->ontology->listSubjects($tmpl->withObject(DF::namedNode(RDF::OWL_RESTRICTION))) as $i) {
+            $i           = new DatasetNode($i);
+            $restriction = new Restriction($i->withDataset($this->ontology), $this->schema);
             $result      &= $restriction->check(true) ?? true;
         }
-        foreach ($this->ontology->allOfType(RDF::OWL_DATATYPE_PROPERTY) as $i) {
-            $property = new Property($i, $this->schema);
-            $result   &= $property->check(true);
-        }
-        foreach ($this->ontology->allOfType(RDF::OWL_OBJECT_PROPERTY) as $i) {
-            $property = new Property($i, $this->schema);
+        $tmpl = new AnyOfTemplate([
+            DF::namedNode(RDF::OWL_DATATYPE_PROPERTY),
+            DF::namedNode(RDF::OWL_OBJECT_PROPERTY),
+        ]);
+        foreach ($this->ontology->listSubjects(new PT(DF::namedNode(RDF::RDF_TYPE))) as $i) {
+            $i        = new DatasetNode($i);
+            $property = new Property($i->withDataset($this->ontology), $this->schema);
             $result   &= $property->check(true);
         }
         return (bool) $result;
@@ -137,8 +136,11 @@ class Ontology {
         $ids      = [];
         $toImport = new MC($repo, null);
         echo $verbose ? "### Preparing ontology for ingestion\n" : '';
+        $tmpl     = new PT(DF::namedNode(RDF::RDF_TYPE));
         foreach (self::$collections as $type) {
-            foreach ($this->ontology->allOfType($type) as $i) {
+            foreach ($this->ontology->listSubjects($tmpl->withObject(DF::namedNode($type))) as $i) {
+                $i = new DatasetNode($i);
+                $i = $i->withDataset($this->ontology);
                 switch ($type) {
                     case RDF::OWL_RESTRICTION:
                         $entity = new Restriction($i, $this->schema);
@@ -157,17 +159,16 @@ class Ontology {
                 $import = $entity->check($verbose); // the check method may alter the $i RDF resource
                 if ($import) {
                     $id = $entity->getId();
-                    if (preg_match('/^_:genid[0-9]+$/', $id)) {
-                        echo $verbose ? "Skipping an anonymous resource \n" . $i->dump('text') : '';
+                    if (preg_match('/^_:genid[0-9]+$/', (string) $id)) {
+                        echo $verbose ? "Skipping an anonymous resource \n$i" : '';
                         continue;
                     }
                     if (in_array($id, $ids)) {
-                        echo $verbose ? "Skipping a duplicated resource \n" . $i->dump('text') : '';
+                        echo $verbose ? "Skipping a duplicated resource \n$i" : '';
                         continue;
                     }
                     $ids[] = $id;
-                    $meta  = $this->sanitizeOwlObject($i, $id, $type);
-                    $meta->copy([], '/^$/', '', $toImport);
+                    $toImport->add($this->sanitizeOwlObject($i, $id, DF::namedNode($type)));
                 }
             }
         }
@@ -190,20 +191,20 @@ class Ontology {
      * @param Repo $repo
      * @param string $owlPath
      * @param bool $verbose
-     * @param Resource|null $collectionMeta
-     * @param Resource|null $resourceMeta
+     * @param DatasetNode|null $collectionMeta
+     * @param DatasetNode|null $resourceMeta
      * @return bool if owl file has been uploaded
      * @throws RuntimeException
      */
     public function importOwlFile(Repo $repo, string $owlPath, bool $verbose,
-                                  ?Resource $collectionMeta = null,
-                                  ?Resource $resourceMeta = null): bool {
+                                  ?DatasetNode $collectionMeta = null,
+                                  ?DatasetNode $resourceMeta = null): bool {
         $s = $this->schema;
 
         echo $verbose ? "###  Updating the owl binary\n" : '';
 
         // collection storing all ontology binaries
-        $collId = $s->namespaces->id . 'acdh-schema';
+        $collId = DF::namedNode($s->namespaces->id . 'acdh-schema');
         try {
             /** @var RepoResource $coll */
             $coll = $repo->getResourceById($collId);
@@ -212,29 +213,25 @@ class Ontology {
                 $coll->updateMetadata();
             }
         } catch (NotFound $e) {
-            $meta = $collectionMeta;
-            if ($meta === null) {
-                $meta = (new Graph())->resource('.');
-            }
-            $meta->addResource($s->id, $collId);
-            if (null === $meta->getLiteral($s->label)) {
-                $meta->addLiteral($s->label, new Literal('ACDH ontology binaries', 'en'));
+            $meta = $collectionMeta ?? new DatasetNode($collId);
+            $meta->add(DF::quad($collId, $s->id, $collId));
+            if ($meta->none(new PT($s->label))) {
+                $meta->add(DF::quad($collId, $s->label, DF::literal('ACDH ontology binaries', 'en')));
             }
             $coll = $repo->createResource($meta);
         }
         echo $verbose ? "    " . $coll->getUri() . "\n" : '';
 
-        $curId = preg_replace('/#$/', '', $this->schema->namespaces->ontology);
+        $curId = DF::namedNode(preg_replace('/#$/', '', $this->schema->namespaces->ontology));
         $old   = null;
 
-        $newMeta = $resourceMeta;
-        if ($newMeta === null) {
-            $newMeta = (new Graph())->resource('.');
-        }
-        $newMeta->addResource($s->id, $curId . '/' . date('Y-m-d_H:m:s'));
-        $newMeta->addResource($s->parent, $coll->getUri());
-        if (null === $newMeta->getLiteral($s->label)) {
-            $newMeta->addLiteral($s->label, new Literal('ACDH schema owl file', 'en'));
+        $newMeta = $resourceMeta ?? new DatasetNode($curId);
+        $newMeta->add([
+            DF::quad($curId, $s->id, DF::namedNode($curId . '/' . date('Y-m-d_H:m:s'))),
+            DF::quad($curId, $s->parent, DF::namedNode($coll->getUri()))
+        ]);
+        if ($newMeta->none(new PT($s->label))) {
+            $newMeta->add(DF::quad($curId, $s->label, DF::literal('ACDH schema owl file', 'en')));
         }
 
         $updated = true;
@@ -243,7 +240,7 @@ class Ontology {
             /** @var RepoResource $old */
             $old = $repo->getResourceById($curId);
 
-            $hash = (string) $old->getGraph()->getLiteral($s->hash);
+            $hash = (string) $old->getGraph()->getObject(new PT($s->hash));
             if (!preg_match('/^(md5|sha1):/', $hash)) {
                 throw new RuntimeException("fixity hash $hash not implemented - update the script");
             }
@@ -254,12 +251,14 @@ class Ontology {
                 $new     = $repo->createResource($newMeta, $binary);
                 echo $verbose ? "      " . $new->getUri() . "\n" : '';
                 $oldMeta = $old->getGraph();
-                $oldMeta->deleteResource($s->id, $curId);
+                $oldMeta->delete(new PT($s->id, $curId));
                 $old->setGraph($oldMeta);
                 $old->updateMetadata(RepoResource::UPDATE_OVERWRITE); // we must loose the old identifier
 
-                $newMeta->addResource($s->id, $curId);
-                $newMeta->addResource($s->isNewVersionOf, $old->getUri());
+                $newMeta->add([
+                    DF::quad($newMeta->getNode(), $s->id, $curId),
+                    DF::quad($newMeta->getNode(), $s->isNewVersionOf, DF::namedNode($old->getUri())),
+                ]);
                 $new->setMetadata($newMeta);
                 $new->updateMetadata();
             } else {
@@ -273,7 +272,7 @@ class Ontology {
             }
         } catch (NotFound $e) {
             echo $verbose ? "    no owl binary - creating\n" : '';
-            $newMeta->addResource($s->id, $curId);
+            $newMeta->add(DF::quadNoSubject($s->id, $curId));
             $new = $repo->createResource($newMeta, $binary);
             echo $verbose ? "      " . $new->getUri() . "\n" : '';
         }
@@ -287,37 +286,32 @@ class Ontology {
      */
     public function getVocabularies(): array {
         $vocabsProp = $this->schema->ontology->vocabs;
-        $vocabs     = [];
-        foreach ($this->ontology->resourcesMatching($vocabsProp) as $res) {
-            foreach ($res->all($vocabsProp) as $i) {
-                $vocabs[] = (string) $i;
-            }
-        }
-        return $vocabs;
+        return $this->ontology->listObjects(new PT($vocabsProp))->getValues();
     }
 
     /**
      * 
      * @param Repo $repo
      * @param string $id
-     * @return void
+     * @return RepoResource
      */
     private function createCollection(Repo $repo, string $id,
                                       ?RepoResource $topColl = null): RepoResource {
         try {
             $res = $repo->getResourceById($id);
         } catch (NotFound $e) {
-            $meta = (new Graph())->resource('.');
-            $meta->addLiteral($this->schema->label, new Literal((string) preg_replace('|^.*[/#]|', '', $id), 'en'));
-            $meta->addResource($this->schema->id, $id);
-            if (str_starts_with($id, 'http://www.w3.org/2002/07/owl#')) {
+            $id   = DF::namedNode($id);
+            $meta = new DatasetNode($id);
+            $meta->add(DF::quad($id, $this->schema->label, DF::literal((string) preg_replace('|^.*[/#]|', '', $id), 'en')));
+            $meta->add(DF::quad($id, $this->schema->id, $id));
+            if (str_starts_with((string) $id, 'http://www.w3.org/2002/07/owl#')) {
                 $desc = "A technical collection for storing internal representation of ontology objects of class $id.";
             } else {
                 $desc = "A technical collection for storing internal representation of ontology objects.";
             }
-            $meta->addLiteral($this->schema->ontology->description, new Literal($desc, 'en'));
+            $meta->add(DF::quad($id, $this->schema->ontology->description, DF::literal($desc, 'en')));
             if ($topColl !== null) {
-                $meta->addResource($this->schema->parent, $topColl->getUri());
+                $meta->add(DF::quad($id, $this->schema->parent, DF::namedNode($topColl->getUri())));
             }
             $res = $repo->createResource($meta);
         }
@@ -328,33 +322,24 @@ class Ontology {
      * Prepares an RDF resource representing an OWL object
      * (class/dataProperty/objectProperty/restriction) for repository import.
      * 
-     * @param \EasyRdf\Resource $res an owl object to be imported/updated
-     * @param string $id desired owl object identifier (may differ from $res URI
-     * @param string $parentId collection in which a repository repository 
+     * @param DatasetNode $res an owl object metadata to be sanitized
+     * @param NamedNodeInterface $id desired owl object identifier (may differ 
+     *   from $res node)
+     * @param NamedNodeInterface $parentId collection in which a repository 
      *   resource should be created
-     * @return \EasyRdf\Resource URL of a created/updated repository resource
+     * @return DatasetNode created/updated repository resource metadata
      */
-    private function sanitizeOwlObject(Resource $res, string $id,
-                                       string $parentId): Resource {
-        $meta = (new Graph())->resource($res->getUri());
-        foreach ($res->propertyUris() as $p) {
-            foreach ($res->allLiterals($p) as $v) {
-                if ($v->getValue() !== '') {
-                    $meta->addLiteral($p, $v->getValue(), $v->getLang() ?? 'en');
-                }
-            }
-            foreach ($res->allResources($p) as $v) {
-                if (!$v->isBNode()) {
-                    $meta->addResource($p, $v);
-                }
-            }
-        }
+    private function sanitizeOwlObject(DatasetNode $res, NamedNodeInterface $id,
+                                       NamedNodeInterface $parentId): DatasetNode {
+        $meta = new DatasetNode($res->getNode());
 
-        $meta->addResource($this->schema->id, $id);
-        $meta->addResource($this->schema->parent, $parentId);
+        $meta->add($res->copy(new PT(null, new LiteralTemplate('', LiteralTemplate::NOT_EQUALS))));
+        $meta->add($res->copy(new PT(null, new NamedNodeTemplate(null, NamedNodeTemplate::ANY))));
+        $meta->add(DF::quadNoSubject($this->schema->id, $id));
+        $meta->add(DF::quadNoSubject($this->schema->parent, $parentId));
 
-        if (null === $meta->getLiteral($this->schema->label)) {
-            $meta->addLiteral($this->schema->label, preg_replace('|^.*[/#]|', '', $id), 'en');
+        if ($meta->none(new PT($this->schema->label))) {
+            $meta->add(DF::quadNoSubject($this->schema->label, DF::literal(preg_replace('|^.*[/#]|', '', $id), 'en')));
         }
 
         return $meta;

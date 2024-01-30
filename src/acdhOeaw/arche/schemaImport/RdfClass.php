@@ -26,6 +26,8 @@
 
 namespace acdhOeaw\arche\schemaImport;
 
+use quickRdf\DataFactory as DF;
+use termTemplates\PredicateTemplate as PT;
 use zozlak\RdfConstants as RDF;
 
 /**
@@ -37,15 +39,15 @@ class RdfClass extends Entity {
 
     public function check(bool $verbose): ?bool {
         $topLevel = true;
-        foreach ($this->res->allResources(RDF::RDFS_SUB_CLASS_OF) as $parent) {
-            /* @var $parent \EasyRdf\Resource */
-            $topLevel &= !$parent->isA(RDF::OWL_CLASS);
+        $ds       = $this->res->getDataset();
+        $tmpl     = new PT(DF::namedNode(RDF::RDF_TYPE), DF::namedNode(RDF::OWL_CLASS));
+        foreach ($this->res->listObjects(new PT(DF::namedNode(RDF::RDFS_SUB_CLASS_OF))) as $parent) {
+            $topLevel &= $ds->none($tmpl->withSubject($parent));
         }
-        if ($topLevel && $this->res->getUri() !== RDF::OWL_THING) {
-            $this->res->addResource(RDF::RDFS_SUB_CLASS_OF, RDF::OWL_THING);
+        if ($topLevel && $this->res->getNode()->getValue() !== RDF::OWL_THING) {
+            $this->res->add(DF::quadNoSubject(DF::namedNode(RDF::RDFS_SUB_CLASS_OF), DF::namedNode(RDF::OWL_THING)));
         }
 
         return true;
     }
-
 }

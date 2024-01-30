@@ -26,6 +26,8 @@
 
 namespace acdhOeaw\arche\schemaImport;
 
+use quickRdf\DataFactory as DF;
+use termTemplates\PredicateTemplate as PT;
 use zozlak\RdfConstants as RDF;
 
 /**
@@ -55,43 +57,48 @@ class Property extends Entity {
      */
     public function check(bool $verbose): ?bool {
         $base   = $this->schema->namespaces->ontology;
+        $resUri = (string) $this->res->getNode();
         $result = true;
-        $range  = (string) $this->res->getResource(RDF::RDFS_RANGE);
 
+        $datatypeTmpl = new PT(DF::namedNode(RDF::RDF_TYPE), DF::namedNode(RDF::OWL_DATATYPE_PROPERTY));
+        $objectTmpl   = new PT(DF::namedNode(RDF::RDF_TYPE), DF::namedNode(RDF::OWL_OBJECT_PROPERTY));
+        $isDatatype   = $this->res->any($datatypeTmpl);
+        $isObject     = $this->res->any($objectTmpl);
+
+        $range = (string) $this->getObject(RDF::RDFS_RANGE);
         if (empty($range)) {
-            echo $verbose ? $this->res->getUri() . " - has an empty range\n" : '';
+            echo $verbose ? "$resUri - has an empty range\n" : '';
             $result = false;
         } else {
-            if (!empty($this->res->get($base . 'langTag')) && $range !== RDF::XSD_STRING) {
-                echo $verbose ? $this->res->getUri() . " - requires a language tag but its range $range is not xsd:string\n" : '';
+            if (!empty($this->getObject($base . 'langTag')) && (string) $range !== RDF::XSD_STRING) {
+                echo $verbose ? "$resUri - requires a language tag but its range $range is not xsd:string\n" : '';
                 $result = false;
             }
-            if (!empty($this->res->get($base . 'langTag')) && !$this->res->isA(RDF::OWL_DATATYPE_PROPERTY)) {
-                echo $verbose ? $this->res->getUri() . " - requires a language tag but it's not a DatatypeProperty\n" : '';
+            if ($this->res->any(new PT($base . 'langTag')) && !$isDatatype) {
+                echo $verbose ? "$resUri - requires a language tag but it's not a DatatypeProperty\n" : '';
+                $result = false;
+            }
+            if ($isDatatype && !in_array((string) $range, self::$literalTypes)) {
+                echo $verbose ? "$resUri - is a DatatypeProperty but its range $range doesn't indicate a literal value\n" : '';
                 $result = false;
             }
 
-            if ($this->res->isA(RDF::OWL_DATATYPE_PROPERTY) && !in_array($range, self::$literalTypes)) {
-                echo $verbose ? $this->res->getUri() . " - is a DatatypeProperty but its range $range doesn't indicate a literal value\n" : '';
-                $result = false;
-            }
-            if ($this->res->isA(RDF::OWL_OBJECT_PROPERTY) && in_array($range, self::$literalTypes)) {
-                echo $verbose ? $this->res->getUri() . " - is an ObjectProperty but its range $range indicates a literal value\n" : '';
+            if ($isObject && in_array((string) $range, self::$literalTypes)) {
+                echo $verbose ? "$resUri - is an ObjectProperty but its range $range indicates a literal value\n" : '';
                 $result = false;
             }
         }
 
-        if ($this->res->isA(RDF::OWL_DATATYPE_PROPERTY) && !empty($this->res->get($base . 'vocabs'))) {
-            echo $verbose ? $this->res->getUri() . " - is a DatatypeProperty with a vocabulary\n" : '';
+        if ($isDatatype && $this->res->any(new PT($base . 'vocabs'))) {
+            echo $verbose ? "$resUri - is a DatatypeProperty with a vocabulary\n" : '';
             $result = false;
         }
 
-        if (count($this->res->allLiterals($base . 'recommendedClass')) > 0) {
-            echo $verbose ? $this->res->getUri() . " - has a recommended annotation with a literal value\n" : '';
+        if ($this->res->any(new PT($base . 'recommendedClass'))) {
+            echo $verbose ? "$resUri - has a recommended annotation with a literal value\n" : '';
             return false;
         }
 
         return $result;
     }
-
 }

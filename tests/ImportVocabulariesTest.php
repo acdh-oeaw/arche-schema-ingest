@@ -62,7 +62,7 @@ class ImportVocabulariesTest extends \PHPUnit\Framework\TestCase {
     }
 
     public function testFull(): void {
-        $tmp             = explode("\n", file_get_contents(__DIR__ . '/../vendor/acdh-oeaw/arche-schema/acdh-schema.owl'));
+        $tmp             = explode("\n", (string) file_get_contents(__DIR__ . '/../vendor/acdh-oeaw/arche-schema/acdh-schema.owl'));
         $tmp             = array_filter($tmp, fn($x) => !preg_match('`v1/iso639_3|v1/oefos`', $x));
         file_put_contents('tmp.owl', implode("\n", $tmp));
         $_SERVER['argv'] = [

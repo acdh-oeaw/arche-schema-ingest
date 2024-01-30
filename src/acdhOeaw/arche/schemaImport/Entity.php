@@ -26,8 +26,12 @@
 
 namespace acdhOeaw\arche\schemaImport;
 
-use EasyRdf\Resource;
-use zozlak\RdfConstants as RDF;
+use rdfInterface\DatasetNodeInterface;
+use rdfInterface\NamedNodeInterface;
+use rdfInterface\TermInterface;
+use termTemplates\PredicateTemplate;
+use quickRdf\DataFactory;
+use acdhOeaw\arche\lib\Schema;
 
 /**
  * Description of Entity
@@ -36,19 +40,10 @@ use zozlak\RdfConstants as RDF;
  */
 class Entity {
 
-    /**
-     *
-     * @var \EasyRdf\Resource
-     */
-    protected $res;
+    protected DatasetNodeInterface $res;
+    protected Schema $schema;
 
-    /**
-     *
-     * @var object
-     */
-    protected $schema;
-
-    public function __construct(Resource $res, object $schema) {
+    public function __construct(DatasetNodeInterface $res, object $schema) {
         $this->res    = $res;
         $this->schema = $schema;
     }
@@ -57,8 +52,17 @@ class Entity {
         return true;
     }
 
-    public function getId(): string {
-        return $this->res->getUri();
+    public function getId(): NamedNodeInterface {
+        return $this->res->getNode();
     }
 
+    /**
+     * Helper for getting an object value for a property passed as a string.
+     * 
+     * @param string $property
+     * @return TermInterface|null
+     */
+    public function getObject(string $property): TermInterface | null {
+        return $this->res->getObject(new PredicateTemplate(DataFactory::namedNode($property)));
+    }
 }

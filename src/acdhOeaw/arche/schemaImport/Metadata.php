@@ -27,12 +27,15 @@
 namespace acdhOeaw\arche\schemaImport;
 
 use RuntimeException;
-use EasyRdf\Graph;
-use EasyRdf\Resource;
-use EasyRdf\Literal;
+use rdfInterface\DatasetNodeInterface;
+use quickRdf\DatasetNode;
+use quickRdf\Dataset;
+use quickRdf\DataFactory as DF;
+use quickRdfIo\Util as RdfUtil;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Request;
 use zozlak\RdfConstants AS RDF;
+use acdhOeaw\arche\lib\Schema;
 
 /**
  * Description of Metadata
@@ -41,44 +44,45 @@ use zozlak\RdfConstants AS RDF;
  */
 class Metadata {
 
-    static public function fromFile(string $file): Resource {
-        $graph = new Graph();
-        $graph->parseFile($file);
-        foreach ($graph->resources() as $res) {
-            if (count($res->propertyUris()) > 0) {
-                return $res;
-            }
+    static public function fromFile(string $file): DatasetNode {
+        $dataset = new Dataset();
+        $dataset->add(RdfUtil::parse($file, new DF()));
+        if (count($dataset) === 0) {
+            throw new RuntimeException("No valid graph node found");
         }
-        throw new RuntimeException("No valid graph node found");
+        $res = new DatasetNode($dataset->getSubject());
+        return $res->withDataset($dataset);
     }
 
-    static public function enrichFromArgs(Resource $meta, object $schema,
-                                          object $args): void {
+    static public function enrichFromArgs(DatasetNodeInterface $meta,
+                                          Schema $schema, object $args): void {
         if (!empty($args->ontologyDate)) {
-            $meta->addLiteral($schema->dateStart, new Literal($args->ontologyDate, null, RDF::XSD_DATE_TIME));
-            $meta->addLiteral($schema->dateEnd, new Literal($args->ontologyDate, null, RDF::XSD_DATE_TIME));
+            $meta->add([
+                DF::quadNoSubject($schema->dateStart, DF::literal($args->ontologyDate, null, RDF::XSD_DATE_TIME)),
+                DF::quadNoSubject($schema->dateEnd, DF::literal($args->ontologyDate, null, RDF::XSD_DATE_TIME)),
+            ]);
         }
         if (!empty($args->ontologyUrl)) {
-            $meta->addLiteral($schema->url, new Literal($args->ontologyUrl, null, RDF::XSD_ANY_URI));
+            $meta->add(DF::quadNoSubject($schema->url, DF::literal($args->ontologyUrl, null, RDF::XSD_ANY_URI)));
         }
         if (!empty($args->ontologyVersion)) {
-            $meta->addLiteral($schema->version, $args->ontologyVersion);
+            $meta->add(DF::quadNoSubject($schema->version, DF::literal($args->ontologyVersion)));
         }
         if (!empty($args->ontologyInfo)) {
-            $meta->addLiteral($schema->info, new Literal($args->ontologyInfo, 'und'));
+            $meta->add(DF::quadNoSubject($schema->info, DF::literal($args->ontologyInfo, 'und')));
         }
     }
 
-    static public function enrichFromComposer(Resource $meta, object $schema,
-                                              string $package): string {
+    static public function enrichFromComposer(DatasetNodeInterface $meta,
+                                              object $schema, string $package): string {
         $version = \Composer\InstalledVersions::getPrettyVersion($package);
-        $meta->addLiteral($schema->version, $version);
+        $meta->add(DF::quadNoSubject($schema->version, DF::literal($version)));
 
         $dir         = \Composer\InstalledVersions::getInstallPath($package);
         $packageMeta = json_decode((string) file_get_contents("$dir/composer.json"));
         if ($packageMeta->homepage ?? false) {
             $baseUrl = $packageMeta->homepage;
-            $meta->addLiteral($schema->url, new Literal("$baseUrl/releases/$version", null, RDF::XSD_ANY_URI));
+            $meta->add(DF::quadNoSubject($schema->url, DF::literal("$baseUrl/releases/$version", null, RDF::XSD_ANY_URI)));
         }
 
         $repoPath = explode('/', $baseUrl ?? '');
@@ -88,11 +92,13 @@ class Metadata {
         $resp     = $client->send(new Request('get', "https://api.github.com/repos/$repoPath/releases/tags/$version", $headers));
         if ($resp->getStatusCode() === 200) {
             $data = json_decode($resp->getBody());
-            $meta->addLiteral($schema->dateStart, new Literal($data->published_at, null, RDF::XSD_DATE_TIME));
-            $meta->addLiteral($schema->dateEnd, new Literal($data->published_at, null, RDF::XSD_DATE_TIME));
+            $meta->add([
+                DF::quadNoSubject($schema->dateStart, DF::literal($data->published_at, null, RDF::XSD_DATE_TIME)),
+                DF::quadNoSubject($schema->dateEnd, DF::literal($data->published_at, null, RDF::XSD_DATE_TIME)),
+            ]);
 
             if (!empty($data->info)) {
-                $meta->addLiteral($schema->infor, new Literal(trim($data->body), 'und'));
+                $meta->add(DF::quadNoSubject($schema->infor, DF::literal(trim($data->body), 'und')));
             }
         }
 
