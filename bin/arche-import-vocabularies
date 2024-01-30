@@ -92,13 +92,13 @@ foreach ($locations as $location) {
         $vocabulary->preprocess();
 
         // extra postprocessing
-        $conceptSchema = $vocabulary->getSubject(new PT(RDF::SKOS_CONCEPT_SCHEMA));
+        $conceptSchema = $vocabulary->getSubject(new PT(RDF::RDF_TYPE, RDF::SKOS_CONCEPT_SCHEMA));
         $accessProp    = $repo->getSchema()->accessRestriction ?? '';
         if ($args->makePublic && !empty($accessProp) && $conceptSchema !== null) {
             echo "Adding $accessProp https://vocabs.acdh.oeaw.ac.at/archeaccessrestrictions/public\n";
             $vocabulary->add(DF::quad($conceptSchema, $accessProp, DF::namedNode('https://vocabs.acdh.oeaw.ac.at/archeaccessrestrictions/public')));
         }
-        if ($args->dropHasTopConcept) {
+        if ($args->dropHasTopConcept && $conceptSchema !== null) {
             echo "Removing skos:hasTopConcept\n";
             $conceptSchema->delete(new PT(DF::namedNode(RDF::SKOS_HAS_TOP_CONCEPT)));
         }
