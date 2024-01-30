@@ -26,6 +26,15 @@
 
 namespace acdhOeaw\arche\schemaImport\tests;
 
+use PDO;
+use GuzzleHttp\Client;
+use GuzzleHttp\Psr7\Request;
+use quickRdf\Dataset;
+use quickRdf\DataFactory as DF;
+use quickRdfIo\Util as RdfIoUtil;
+use termTemplates\QuadTemplate as QT;
+use termTemplates\PredicateTemplate as PT;
+use termTemplates\NamedNodeTemplate as NNT;
 use zozlak\RdfConstants as RDF;
 
 /**
@@ -40,25 +49,59 @@ class ImportVocabulariesTest extends \PHPUnit\Framework\TestCase {
     }
 
     static public function tearDownAfterClass(): void {
-        exec("docker exec -u www-data arche bash -c \"echo 'truncate resources cascade;' | psql\"  2>&1 > /dev/null");
         if (file_exists('tmp.owl')) {
             unlink('tmp.owl');
         }
     }
 
     public function testSimple(): void {
+        $vocabUrl  = 'https://vocabs.acdh.oeaw.ac.at/rest/v1/arche_category/data';
+        $pdo       = new PDO('pgsql: host=127.0.0.1 user=www-data');
+        $vocabResp = (new Client())->send(new Request('GET', $vocabUrl, ['Accept' => 'application/rdf+xml']));
+        $ds        = new Dataset();
+        $ds->add(RdfIoUtil::parse($vocabResp, new DF()));
+        $expected  = $ds->listSubjects(new PT(RDF::RDF_TYPE, RDF::SKOS_CONCEPT))->getValues();
+        sort($expected);
+
         $_SERVER['argv'] = [
             'test',
+            '--verbose',
             '--user', 'admin',
             '--pswd', 'pswd',
-            '--vocabularyLocation', 'https://vocabs.acdh.oeaw.ac.at/rest/v1/arche_category/data',
+            '--vocabularyLocation', $vocabUrl,
             '--concurrency', '6',
             '--force',
             'http://127.0.0.1/api',
         ];
         require __DIR__ . '/../bin/arche-import-vocabularies';
-        // as for now test just for no error
-        $this->assertTrue(true);
+
+        $query  = $pdo->prepare("
+            SELECT ids
+            FROM metadata m JOIN identifiers i USING (id)
+            WHERE
+                m.property = ?
+                AND m.value = ?
+                AND ids LIKE ?
+            ORDER BY 1
+        ");
+        $query->execute([RDF::RDF_TYPE, RDF::SKOS_CONCEPT, 'https://vocabs.acdh.oeaw.ac.at/archecategory%']);
+        $actual = $query->fetchAll(PDO::FETCH_COLUMN);
+        // two array_diffs for cleaner error messages
+        $this->assertEquals([], array_diff($expected, $actual));
+        $this->assertEquals([], array_diff($actual, $expected));
+        
+        // test merging on exact match
+        $query = $pdo->prepare("
+            SELECT count(*) 
+            FROM metadata_view 
+            WHERE id = (
+                SELECT id 
+                FROM identifiers i1 JOIN identifiers i2 USING (id) 
+                WHERE i1.ids = ? AND i2.ids = ?
+            )
+        ");
+        $query->execute(['http://purl.org/dc/dcmitype/MovingImage', 'https://vocabs.acdh.oeaw.ac.at/archecategory/audioVisual']);
+        $this->assertGreaterThan(15, $query->fetchColumn());
     }
 
     public function testFull(): void {
@@ -67,6 +110,7 @@ class ImportVocabulariesTest extends \PHPUnit\Framework\TestCase {
         file_put_contents('tmp.owl', implode("\n", $tmp));
         $_SERVER['argv'] = [
             'test',
+            '--verbose',
             '--user', 'admin',
             '--pswd', 'pswd',
             '--concurrency', '6',

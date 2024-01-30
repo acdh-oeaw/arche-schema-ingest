@@ -26,6 +26,15 @@
 
 namespace acdhOeaw\arche\schemaImport\tests;
 
+use PDO;
+use quickRdf\Dataset;
+use quickRdf\DataFactory as DF;
+use quickRdfIo\Util as RdfIoUtil;
+use termTemplates\QuadTemplate as QT;
+use termTemplates\PredicateTemplate as PT;
+use termTemplates\NamedNodeTemplate as NNT;
+use zozlak\RdfConstants as RDF;
+
 /**
  * Description of IndexerTest
  *
@@ -38,12 +47,12 @@ class ImportOntologyTest extends \PHPUnit\Framework\TestCase {
     }
 
     static public function tearDownAfterClass(): void {
-        exec("docker exec -u www-data arche bash -c \"echo 'truncate resources cascade;' | psql\"  2>&1 > /dev/null");
     }
-    
+
     public function testPackage(): void {
         $_SERVER['argv'] = [
             'test',
+            '--verbose',
             '--user', 'admin',
             '--pswd', 'pswd',
             '--concurrency', '6',
@@ -54,8 +63,11 @@ class ImportOntologyTest extends \PHPUnit\Framework\TestCase {
     }
 
     public function testFile(): void {
+        $nmsp = 'https://vocabs.acdh.oeaw.ac.at/schema#';
+
         $_SERVER['argv'] = [
             'test',
+            '--verbose',
             '--user', 'admin',
             '--pswd', 'pswd',
             '--concurrency', '6',
@@ -67,6 +79,44 @@ class ImportOntologyTest extends \PHPUnit\Framework\TestCase {
             'http://127.0.0.1/api'
         ];
         require __DIR__ . '/../bin/arche-import-ontology';
-        $this->assertTrue(true);
+
+        $ds = new Dataset();
+        $ds->add(RdfIoUtil::parse(__DIR__ . '/../vendor/acdh-oeaw/arche-schema/acdh-schema.owl', new DF(), 'application/rdf+xml'));
+
+        $pdo       = new PDO('pgsql: host=127.0.0.1 user=www-data');
+        $query     = $pdo->prepare("
+            SELECT ids
+            FROM metadata m JOIN identifiers i USING (id)
+            WHERE
+                m.property = ?
+                AND m.value = ?
+                AND ids LIKE ?
+            ORDER BY 1
+        ");
+        $classTmpl = new QT(new NNT($nmsp, NNT::STARTS), DF::namedNode(RDF::RDF_TYPE));
+        $classes   = [
+            RDF::OWL_ANNOTATION_PROPERTY,
+            RDF::OWL_CLASS,
+            RDF::OWL_DATATYPE_PROPERTY,
+            RDF::OWL_OBJECT_PROPERTY
+        ];
+        foreach ($classes as $class) {
+            $expected = $ds->listSubjects($classTmpl->withObject(DF::namedNode($class)))->getValues();
+            sort($expected);
+
+            $query->execute([RDF::RDF_TYPE, $class, "$nmsp%"]);
+            $actual = $query->fetchAll(PDO::FETCH_COLUMN);
+
+            // two array_diffs for cleaner error messages
+            $this->assertEquals([], array_diff($expected, $actual), $class);
+            $this->assertEquals([], array_diff($actual, $expected), $class);
+        }
+
+        $class    = RDF::OWL_RESTRICTION;
+        $tmpl     = new PT(DF::namedNode(RDF::RDF_TYPE), DF::namedNode($class));
+        $expected = $ds->copy($tmpl)->count();
+        $query->execute([RDF::RDF_TYPE, $class, "$nmsp%"]);
+        $actual   = count($query->fetchAll(PDO::FETCH_COLUMN));
+        $this->assertEquals($expected, $actual, $class);
     }
 }

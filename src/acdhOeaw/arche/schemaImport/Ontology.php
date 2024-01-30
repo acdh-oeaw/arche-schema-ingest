@@ -169,13 +169,15 @@ class Ontology {
                     }
                     $ids[] = $id;
                     $toImport->add($this->sanitizeOwlObject($i, $id, DF::namedNode($type)));
+                } else {
+                    echo $verbose ? "Skipping ".$i->getNode()." because of failed checks\n" : '';
                 }
             }
         }
 
         echo $verbose ? "### Ingesting the ontology\n" : '';
-        $debug     = SV::$debug;
-        MC::$debug = $verbose ? 2 : 1;
+        $debug     = MC::$debug;
+        MC::$debug = $verbose;
         $imported  = $toImport->import('', MC::SKIP, MC::ERRMODE_FAIL, $concurrency, $concurrency);
         $imported  = array_map(fn($x) => $x instanceof RepoResource ? $x->getUri() : '', $imported);
         MC::$debug = $debug;

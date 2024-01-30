@@ -28,6 +28,7 @@ namespace acdhOeaw\arche\schemaImport;
 
 use quickRdf\DataFactory as DF;
 use termTemplates\PredicateTemplate as PT;
+use termTemplates\LiteralTemplate as LT;
 use zozlak\RdfConstants as RDF;
 
 /**
@@ -94,9 +95,9 @@ class Property extends Entity {
             $result = false;
         }
 
-        if ($this->res->any(new PT($base . 'recommendedClass'))) {
+        if ($this->res->any(new PT($base . 'recommendedClass', new LT(null, LT::ANY)))) {
             echo $verbose ? "$resUri - has a recommended annotation with a literal value\n" : '';
-            return false;
+            $result = false;
         }
 
         return $result;
