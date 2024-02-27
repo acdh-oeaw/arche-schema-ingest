@@ -69,8 +69,12 @@ class Property extends Entity {
         try {
             $range = (string) $this->getObject(RDF::RDFS_RANGE);
             if (empty($range)) {
-                echo $verbose ? "$resUri - has an empty range\n" : '';
-                $result = false;
+                // properties with children may not have range - it marks them as not-to-be-used-directly ones
+                $tmpl = new PT(DF::namedNode(RDF::RDFS_SUB_PROPERTY_OF), $this->res->getNode());
+                if ($this->res->getDataset()->none($tmpl)) {
+                    echo $verbose ? "$resUri - has an empty range\n" : '';
+                    $result = false;
+                }
             } else {
                 if (!empty($this->getObject($base . 'langTag')) && (string) $range !== RDF::XSD_STRING) {
                     echo $verbose ? "$resUri - requires a language tag but its range $range is not xsd:string\n" : '';
