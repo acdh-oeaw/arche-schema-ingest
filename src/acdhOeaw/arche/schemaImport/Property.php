@@ -56,12 +56,15 @@ class Property extends Entity {
     public function check(bool $verbose): ?bool {
         $base   = $this->schema->namespaces->ontology;
         $result = true;
-        $range  = (string) $this->res->getResource(RDF::RDFS_RANGE);
-
-        if (empty($range)) {
+        $range  = $this->res->allResources(RDF::RDFS_RANGE);
+        if (count($range) > 1) {
+            echo $verbose ? $this->res->getUri() . " - has multiple ranges\n" : '';
+            $result = false;
+        } elseif (count($range) === 0) {
             echo $verbose ? $this->res->getUri() . " - has an empty range\n" : '';
             $result = false;
         } else {
+            $range = (string) array_pop($range);
             if (!empty($this->res->get($base . 'langTag')) && $range !== RDF::XSD_STRING) {
                 echo $verbose ? $this->res->getUri() . " - requires a language tag but its range $range is not xsd:string\n" : '';
                 $result = false;
@@ -93,5 +96,4 @@ class Property extends Entity {
 
         return $result;
     }
-
 }
