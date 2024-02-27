@@ -61,8 +61,10 @@ class Property extends Entity {
             echo $verbose ? $this->res->getUri() . " - has multiple ranges\n" : '';
             $result = false;
         } elseif (count($range) === 0) {
-            echo $verbose ? $this->res->getUri() . " - has an empty range\n" : '';
-            $result = false;
+            if (count($this->res->getGraph()->resourcesMatching(RDF::RDFS_SUB_PROPERTY_OF, $this->res)) === 0) {
+                echo $verbose ? $this->res->getUri() . " - has an empty range\n" : '';
+                $result = false;
+            }
         } else {
             $range = (string) array_pop($range);
             if (!empty($this->res->get($base . 'langTag')) && $range !== RDF::XSD_STRING) {

@@ -20,7 +20,7 @@
         }
     },
     "require": {
-        "php": ">= 8 <8.2",
+        "php": ">= 8 <8.3",
         "guzzlehttp/guzzle": "^7",
         "acdh-oeaw/easyrdf": "*",
         "acdh-oeaw/arche-schema": "*",
