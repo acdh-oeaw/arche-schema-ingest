@@ -66,28 +66,33 @@ class Property extends Entity {
         $isDatatype   = $this->res->any($datatypeTmpl);
         $isObject     = $this->res->any($objectTmpl);
 
-        $range = (string) $this->getObject(RDF::RDFS_RANGE);
-        if (empty($range)) {
-            echo $verbose ? "$resUri - has an empty range\n" : '';
-            $result = false;
-        } else {
-            if (!empty($this->getObject($base . 'langTag')) && (string) $range !== RDF::XSD_STRING) {
-                echo $verbose ? "$resUri - requires a language tag but its range $range is not xsd:string\n" : '';
+        try {
+            $range = (string) $this->getObject(RDF::RDFS_RANGE);
+            if (empty($range)) {
+                echo $verbose ? "$resUri - has an empty range\n" : '';
                 $result = false;
-            }
-            if ($this->res->any(new PT($base . 'langTag')) && !$isDatatype) {
-                echo $verbose ? "$resUri - requires a language tag but it's not a DatatypeProperty\n" : '';
-                $result = false;
-            }
-            if ($isDatatype && !in_array((string) $range, self::$literalTypes)) {
-                echo $verbose ? "$resUri - is a DatatypeProperty but its range $range doesn't indicate a literal value\n" : '';
-                $result = false;
-            }
+            } else {
+                if (!empty($this->getObject($base . 'langTag')) && (string) $range !== RDF::XSD_STRING) {
+                    echo $verbose ? "$resUri - requires a language tag but its range $range is not xsd:string\n" : '';
+                    $result = false;
+                }
+                if ($this->res->any(new PT($base . 'langTag')) && !$isDatatype) {
+                    echo $verbose ? "$resUri - requires a language tag but it's not a DatatypeProperty\n" : '';
+                    $result = false;
+                }
+                if ($isDatatype && !in_array((string) $range, self::$literalTypes)) {
+                    echo $verbose ? "$resUri - is a DatatypeProperty but its range $range doesn't indicate a literal value\n" : '';
+                    $result = false;
+                }
 
-            if ($isObject && in_array((string) $range, self::$literalTypes)) {
-                echo $verbose ? "$resUri - is an ObjectProperty but its range $range indicates a literal value\n" : '';
-                $result = false;
+                if ($isObject && in_array((string) $range, self::$literalTypes)) {
+                    echo $verbose ? "$resUri - is an ObjectProperty but its range $range indicates a literal value\n" : '';
+                    $result = false;
+                }
             }
+        } catch (\RuntimeException $e) {
+            echo $verbose ? "$resUri - " . $e->getMessage() . "\n" : '';
+            $result = false;
         }
 
         if ($isDatatype && $this->res->any(new PT($base . 'vocabs'))) {

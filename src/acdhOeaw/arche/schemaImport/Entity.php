@@ -63,6 +63,10 @@ class Entity {
      * @return TermInterface|null
      */
     public function getObject(string $property): TermInterface | null {
-        return $this->res->getObject(new PredicateTemplate(DataFactory::namedNode($property)));
+        $tmp = $this->res->copy(new PredicateTemplate(DataFactory::namedNode($property)));
+        if (count($tmp) > 1) {
+            throw new \RuntimeException("multiple $property property values");
+        }
+        return $tmp->getObject();
     }
 }

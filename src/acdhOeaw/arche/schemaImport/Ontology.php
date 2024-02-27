@@ -116,7 +116,7 @@ class Ontology {
             DF::namedNode(RDF::OWL_DATATYPE_PROPERTY),
             DF::namedNode(RDF::OWL_OBJECT_PROPERTY),
         ]);
-        foreach ($this->ontology->listSubjects(new PT(DF::namedNode(RDF::RDF_TYPE))) as $i) {
+        foreach ($this->ontology->listSubjects(new PT(DF::namedNode(RDF::RDF_TYPE), $tmpl)) as $i) {
             $i        = new DatasetNode($i);
             $property = new Property($i->withDataset($this->ontology), $this->schema);
             $result   &= $property->check(true);
@@ -170,7 +170,7 @@ class Ontology {
                     $ids[] = $id;
                     $toImport->add($this->sanitizeOwlObject($i, $id, DF::namedNode($type)));
                 } else {
-                    echo $verbose ? "Skipping ".$i->getNode()." because of failed checks\n" : '';
+                    echo $verbose ? "Skipping " . $i->getNode() . " because of failed checks\n" : '';
                 }
             }
         }
