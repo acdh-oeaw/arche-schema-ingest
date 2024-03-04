@@ -340,7 +340,7 @@ class Ontology {
         foreach ($res->propertyUris() as $p) {
             foreach ($res->allLiterals($p) as $v) {
                 if ($v->getValue() !== '') {
-                    $meta->addLiteral($p, $v->getValue(), $v->getLang() ?? 'en');
+                    $meta->addLiteral($p, $v);
                 }
             }
             foreach ($res->allResources($p) as $v) {
