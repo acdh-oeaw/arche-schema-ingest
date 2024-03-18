@@ -51,6 +51,7 @@ class Property extends Entity {
         RDF::XSD_FLOAT, RDF::XSD_DOUBLE,
         RDF::XSD_STRING,
         RDF::XSD_ANY_URI,
+        RDF::RDF_LANG_STRING,
     ];
 
     /**
