@@ -11,7 +11,7 @@ jobs:
       run: |
         git clone --depth 1 --branch arche https://github.com/acdh-oeaw/arche-docker-config.git config
         chmod -x config/run.d/* config/initScripts/*
-        chmod +x config/run.d/postgresql.sh config/run.d/config-yaml.sh config/run.d/xdebug.sh config/initScripts/00-cleanup.sh config/initScripts/01-adminPswd.php
+        chmod +x config/run.d/*postgresql.sh config/run.d/*config-yaml.sh config/run.d/*xdebug.sh config/initScripts/*00-cleanup.sh config/initScripts/01-adminPswd.php
         cp .github/workflows/test-postgresql_config.sh config/run.d/
         sed -i -e 's/checkUnknownProperties:.*/checkUnknownProperties: false/g' config/yaml/doorkeeper.yaml
         sed -i -e 's/checkAutoCreatedResources:.*/checkAutoCreatedResources: false/g' config/yaml/doorkeeper.yaml
