@@ -47,6 +47,7 @@ class ImportOntologyTest extends \PHPUnit\Framework\TestCase {
     }
 
     static public function tearDownAfterClass(): void {
+        
     }
 
     public function testPackage(): void {
@@ -118,5 +119,65 @@ class ImportOntologyTest extends \PHPUnit\Framework\TestCase {
         $query->execute([RDF::RDF_TYPE, $class, "$nmsp%"]);
         $actual   = count($query->fetchAll(PDO::FETCH_COLUMN));
         $this->assertEquals($expected, $actual, $class);
+    }
+
+    public function testRemoveNotSetAttributes(): void {
+        $pdo              = new PDO('pgsql: host=127.0.0.1 user=www-data');
+        $queryMeta        = $pdo->prepare("
+            SELECT property, value 
+            FROM metadata 
+            WHERE id = (SELECT id FROM identifiers WHERE ids = 'https://vocabs.acdh.oeaw.ac.at/schema#foo')
+        ");
+        $queryRecommended = $pdo->prepare("
+            SELECT count(*)
+            FROM 
+                relations r 
+                JOIN identifiers i1 USING (id) 
+                JOIN identifiers i2 ON r.target_id = i2.id
+            WHERE
+                r.property = 'https://vocabs.acdh.oeaw.ac.at/schema#recommendedClass'
+                AND i1.ids = 'https://vocabs.acdh.oeaw.ac.at/schema#foo'
+                AND i2.ids = 'https://vocabs.acdh.oeaw.ac.at/schema#Collection'
+        ");
+        $_SERVER['argv']  = [
+            'test',
+            '--verbose',
+            '--user', 'admin',
+            '--pswd', 'pswd',
+            '--concurrency', '6',
+            '--ontologyFile', __DIR__ . '/withAttributes.owl',
+            '--ontologyVersion', '99.0.0',
+            '--ontologyUrl', 'https://github.com/acdh-oeaw/arche-schema',
+            '--ontologyDate', '2099-12-31',
+            '--ontologyInfo', 'Fake ontology version',
+            'http://127.0.0.1/api'
+        ];
+
+        // with attributes
+        require __DIR__ . '/../bin/arche-import-ontology';
+        $queryMeta->execute([]);
+        $meta = $queryMeta->fetchAll(PDO::FETCH_NUM);
+        $meta = array_combine(array_map(fn($x) => $x[0], $meta), array_map(fn($x) => $x[1], $meta));
+        $this->assertEquals(true, $meta['https://vocabs.acdh.oeaw.ac.at/schema#automatedFill'] ?? null);
+        $this->assertEquals('https://default', $meta['https://vocabs.acdh.oeaw.ac.at/schema#defaultValue'] ?? null);
+        $this->assertEquals('https://example', $meta['https://vocabs.acdh.oeaw.ac.at/schema#exampleValue'] ?? null);
+        $this->assertEquals(12, $meta['https://vocabs.acdh.oeaw.ac.at/schema#ordering'] ?? null);
+        $this->assertEquals('https://vocabs', $meta['https://vocabs.acdh.oeaw.ac.at/schema#vocabs'] ?? null);
+        $queryRecommended->execute([]);
+        $this->assertEquals(1, $queryRecommended->fetchColumn());
+
+        // without attributes
+        $_SERVER['argv'][9] = __DIR__ . '/withoutAttributes.owl';
+        require __DIR__ . '/../bin/arche-import-ontology';
+        $queryMeta->execute([]);
+        $meta               = $queryMeta->fetchAll(PDO::FETCH_NUM);
+        $meta               = array_combine(array_map(fn($x) => $x[0], $meta), array_map(fn($x) => $x[1], $meta));
+        $this->assertNull($meta['https://vocabs.acdh.oeaw.ac.at/schema#automatedFill'] ?? null);
+        $this->assertNull($meta['https://vocabs.acdh.oeaw.ac.at/schema#defaultValue'] ?? null);
+        $this->assertNull($meta['https://vocabs.acdh.oeaw.ac.at/schema#exampleValue'] ?? null);
+        $this->assertNull($meta['https://vocabs.acdh.oeaw.ac.at/schema#ordering'] ?? null);
+        $this->assertNull($meta['https://vocabs.acdh.oeaw.ac.at/schema#vocabs'] ?? null);
+        $queryRecommended->execute([]);
+        $this->assertEquals(0, $queryRecommended->fetchColumn());
     }
 }

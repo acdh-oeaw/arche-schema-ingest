@@ -133,6 +133,10 @@ class Ontology {
             $this->createCollection($repo, $id, $topColl);
         }
 
+        $annotationProps = $this->ontology->listSubjects(new PT(DF::namedNode(RDF::RDF_TYPE), DF::namedNode(RDF::OWL_ANNOTATION_PROPERTY)));
+        $annotationTmpls = array_map(fn($x) => new PT($x), iterator_to_array($annotationProps));
+        $deleteProp      = $repo->getSchema()->delete;
+
         $ids      = [];
         $toImport = new MC($repo, null);
         echo $verbose ? "### Preparing ontology for ingestion\n" : '';
@@ -168,7 +172,7 @@ class Ontology {
                         continue;
                     }
                     $ids[] = $id;
-                    $toImport->add($this->sanitizeOwlObject($i, $id, DF::namedNode($type)));
+                    $toImport->add($this->sanitizeOwlObject($i, $id, DF::namedNode($type), $annotationTmpls, $deleteProp));
                 } else {
                     echo $verbose ? "Skipping " . $i->getNode() . " because of failed checks\n" : '';
                 }
@@ -329,10 +333,13 @@ class Ontology {
      *   from $res node)
      * @param NamedNodeInterface $parentId collection in which a repository 
      *   resource should be created
+     * @param array<PT> $annotationTmpls templates for annotation property matching
      * @return DatasetNode created/updated repository resource metadata
      */
     private function sanitizeOwlObject(DatasetNode $res, NamedNodeInterface $id,
-                                       NamedNodeInterface $parentId): DatasetNode {
+                                       NamedNodeInterface $parentId,
+                                       array $annotationTmpls,
+                                       NamedNodeInterface $delProp): DatasetNode {
         $meta = new DatasetNode($res->getNode());
 
         $meta->add($res->copy(new PT(null, new LiteralTemplate('', LiteralTemplate::NOT_EQUALS))));
@@ -342,6 +349,11 @@ class Ontology {
 
         if ($meta->none(new PT($this->schema->label))) {
             $meta->add(DF::quadNoSubject($this->schema->label, DF::literal(preg_replace('|^.*[/#]|', '', $id), 'en')));
+        }
+        foreach ($annotationTmpls as $i) {
+            if ($meta->none($i)) {
+                $meta->add(DF::quadNoSubject($delProp, $i->getPredicate()));
+            }
         }
 
         return $meta;
