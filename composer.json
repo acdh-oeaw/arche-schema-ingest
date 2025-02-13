@@ -23,7 +23,7 @@
         "php": "^8.1",
         "guzzlehttp/guzzle": "^7",
         "acdh-oeaw/arche-schema": "*",
-        "acdh-oeaw/arche-lib-ingest": "^4",
+        "acdh-oeaw/arche-lib-ingest": "^4 | ^5",
         "zozlak/rdf-constants": "^1.2.1",
         "zozlak/argparse": "^1.0",
         "composer-runtime-api": "^2.1"
