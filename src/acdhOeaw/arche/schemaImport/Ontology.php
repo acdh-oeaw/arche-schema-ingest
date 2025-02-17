@@ -56,6 +56,8 @@ use zozlak\RdfConstants as RDF;
  */
 class Ontology {
 
+    const PROLONG_TIMEOUT = 10;
+    
     /**
      * restrictions go first as checkRestriction() can affect the whole graph
      * @var array<string>
@@ -137,6 +139,7 @@ class Ontology {
         $annotationTmpls = array_map(fn($x) => new PT($x), iterator_to_array($annotationProps));
         $deleteProp      = $repo->getSchema()->delete;
 
+        $t        = time();
         $ids      = [];
         $toImport = new MC($repo, null);
         echo $verbose ? "### Preparing ontology for ingestion\n" : '';
@@ -175,6 +178,10 @@ class Ontology {
                     $toImport->add($this->sanitizeOwlObject($i, $id, DF::namedNode($type), $annotationTmpls, $deleteProp));
                 } else {
                     echo $verbose ? "Skipping " . $i->getNode() . " because of failed checks\n" : '';
+                }
+                if (time() - $t > self::PROLONG_TIMEOUT) {
+                    $repo->prolong();
+                    $t = time();
                 }
             }
         }
