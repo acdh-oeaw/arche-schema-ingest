@@ -42,6 +42,8 @@ use zozlak\RdfConstants as RDF;
  */
 class ImportOntologyTest extends \PHPUnit\Framework\TestCase {
 
+    const PROP_LABEL = 'https://vocabs.acdh.oeaw.ac.at/schema#hasTitle';
+
     static public function setUpBeforeClass(): void {
         exec("docker exec -u www-data arche bash -c \"echo 'truncate resources cascade;' | psql\" 2>&1 > /dev/null");
     }
@@ -119,6 +121,16 @@ class ImportOntologyTest extends \PHPUnit\Framework\TestCase {
         $query->execute([RDF::RDF_TYPE, $class, "$nmsp%"]);
         $actual   = count($query->fetchAll(PDO::FETCH_COLUMN));
         $this->assertEquals($expected, $actual, $class);
+
+        $query = $pdo->prepare("
+            SELECT count(*) 
+            FROM identifiers i 
+            WHERE 
+                NOT EXISTS (SELECT 1 FROM metadata WHERE id = i.id AND property = ?)
+                AND (ids LIKE ? OR ids LIKE ?)
+        ");
+        $query->execute([self::PROP_LABEL, RDF::NMSP_XSD . '%', RDF::NMSP_RDFS . '%']);
+        $this->assertEquals(0, $query->fetchColumn());
     }
 
     public function testRemoveNotSetAttributes(): void {

@@ -26,11 +26,13 @@
 
 namespace acdhOeaw\arche\schemaImport;
 
+use AppendIterator;
 use RuntimeException;
 use rdfInterface\NamedNodeInterface;
 use quickRdf\DataFactory as DF;
 use quickRdf\Dataset;
 use quickRdf\DatasetNode;
+use termTemplates\QuadTemplate as QT;
 use termTemplates\PredicateTemplate as PT;
 use termTemplates\LiteralTemplate;
 use termTemplates\NamedNodeTemplate;
@@ -57,7 +59,13 @@ use zozlak\RdfConstants as RDF;
 class Ontology {
 
     const PROLONG_TIMEOUT = 10;
-    
+    const NAMESPACES      = [
+        RDF::NMSP_XSD  => 'xsd:',
+        RDF::NMSP_OWL  => 'owl:',
+        RDF::NMSP_RDF  => 'rdf:',
+        RDF::NMSP_RDFS => 'rdfs:',
+    ];
+
     /**
      * restrictions go first as checkRestriction() can affect the whole graph
      * @var array<string>
@@ -185,11 +193,14 @@ class Ontology {
                 }
             }
         }
+        $this->addMissingTechnicalResources($toImport);
 
         echo $verbose ? "### Ingesting the ontology\n" : '';
         $debug     = MC::$debug;
         MC::$debug = $verbose;
-        $imported  = $toImport->import('', MC::SKIP, MC::ERRMODE_FAIL, $concurrency, $concurrency);
+        echo $toImport->copy(new \termTemplates\QuadTemplate(DF::namedNode(RDF::XSD_ANY_URI)));
+        echo "\n----------------------\n";
+        $imported  = $toImport->import('', MC::CREATE, MC::ERRMODE_FAIL, $concurrency, $concurrency);
         $imported  = array_map(fn($x) => $x instanceof RepoResource ? $x->getUri() : '', $imported);
         MC::$debug = $debug;
 
@@ -408,6 +419,20 @@ class Ontology {
 
             if (count($toDel) > 0) {
                 throw new RepoLibException("Failed to remove all obsolete $collectionId children");
+            }
+        }
+    }
+
+    private function addMissingTechnicalResources(Dataset $dataset): void {
+        $iter = new AppendIterator();
+        $iter->append($dataset->listObjects(new PT(RDF::RDFS_RANGE)));
+        $iter->append($dataset->listObjects(new PT(RDF::RDFS_SUB_PROPERTY_OF)));
+        foreach ($iter as $res) {
+            if ($dataset->none(new QT($res))) {
+                $dataset->add(DF::quad($res, $this->schema->id, $res));
+                $label = DF::literal(str_replace(array_keys(self::NAMESPACES), array_values(self::NAMESPACES), (string) $res), 'und');
+                $dataset->add(DF::quad($res, $this->schema->label, $label));
+                echo "CREATING " . DF::quad($res, $this->schema->label, $label) . "\n";
             }
         }
     }
