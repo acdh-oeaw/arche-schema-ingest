@@ -27,12 +27,12 @@
 namespace acdhOeaw\arche\schemaImport;
 
 use RuntimeException;
+use zozlak\ProxyClient;
 use rdfInterface\DatasetNodeInterface;
 use quickRdf\DatasetNode;
 use quickRdf\Dataset;
 use quickRdf\DataFactory as DF;
 use quickRdfIo\Util as RdfUtil;
-use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Request;
 use zozlak\RdfConstants AS RDF;
 use acdhOeaw\arche\lib\Schema;
@@ -87,7 +87,7 @@ class Metadata {
 
         $repoPath = explode('/', $baseUrl ?? '');
         $repoPath = implode('/', array_slice($repoPath, count($repoPath) - 2));
-        $client   = new Client(['http_errors' => false]);
+        $client   = ProxyClient::factory(['http_errors' => false]);
         $headers  = ['Accept' => 'application/json'];
         $resp     = $client->send(new Request('get', "https://api.github.com/repos/$repoPath/releases/tags/$version", $headers));
         if ($resp->getStatusCode() === 200) {
