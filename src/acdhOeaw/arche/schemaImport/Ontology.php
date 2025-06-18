@@ -432,7 +432,7 @@ class Ontology {
                 $dataset->add(DF::quad($res, $this->schema->id, $res));
                 $label = DF::literal(str_replace(array_keys(self::NAMESPACES), array_values(self::NAMESPACES), (string) $res), 'und');
                 $dataset->add(DF::quad($res, $this->schema->label, $label));
-                echo "CREATING " . DF::quad($res, $this->schema->label, $label) . "\n";
+                echo "Adding " . DF::quad($res, $this->schema->label, $label) . "\n";
             }
         }
     }
