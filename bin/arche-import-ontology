@@ -65,6 +65,7 @@ try {
         $ontologyFile = Metadata::enrichFromComposer($ontologyMeta, $schema->ontology, 'acdh-oeaw/arche-schema');
     } else {
         echo "Creating ontology metadata from call parameters";
+        /** @phpstan-ignore argument.type */
         Metadata::enrichFromArgs($ontologyMeta, $schema->ontology, $args);
         $ontologyFile = $args->ontologyFile;
     }
