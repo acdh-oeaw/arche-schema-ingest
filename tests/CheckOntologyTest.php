@@ -41,6 +41,7 @@ class CheckOntologyTest extends \PHPUnit\Framework\TestCase {
         ];
         require __DIR__ . '/../bin/arche-check-ontology';
         // as for now test just for no error
+        /** @phpstan-ignore method.alreadyNarrowedType */
         $this->assertTrue(true);
     }
 }

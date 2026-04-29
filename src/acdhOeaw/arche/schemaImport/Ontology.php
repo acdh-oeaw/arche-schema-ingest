@@ -309,6 +309,7 @@ class Ontology {
      * @return array<string>
      */
     public function getVocabularies(): array {
+        /** @phpstan-ignore property.notFound */
         $vocabsProp = $this->schema->ontology->vocabs;
         return $this->ontology->listObjects(new PT($vocabsProp))->getValues();
     }
@@ -333,12 +334,14 @@ class Ontology {
             } else {
                 $desc = "A technical collection for storing internal representation of ontology objects.";
             }
+            /** @phpstan-ignore property.notFound */
             $meta->add(DF::quad($id, $this->schema->ontology->description, DF::literal($desc, 'en')));
             if ($topColl !== null) {
                 $meta->add(DF::quad($id, $this->schema->parent, DF::namedNode($topColl->getUri())));
             }
             $res = $repo->createResource($meta);
         }
+        /** @var RepoResource $res */
         return $res;
     }
 
@@ -370,6 +373,7 @@ class Ontology {
         }
         foreach ($annotationTmpls as $i) {
             if ($meta->none($i)) {
+                /** @phpstan-ignore argument.type */
                 $meta->add(DF::quadNoSubject($delProp, $i->getPredicate()));
             }
         }

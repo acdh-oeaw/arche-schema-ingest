@@ -5,8 +5,19 @@ on: push
 jobs:
   phpunit:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php: [8.1, 8.2, 8.3, 8.4, 8.5]
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
+    - name: php
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ matrix.php }}
+    - name: composer
+      run: composer update
+    - name: phpstan
+      run: vendor/bin/phpstan analyze -l 6 src tests bin
     - name: clone repo config
       run: |
         git clone --depth 1 --branch arche https://github.com/acdh-oeaw/arche-docker-config.git config
@@ -20,9 +31,6 @@ jobs:
       run: |
         mkdir log
         docker run --name arche -p 80:80 -p 5432:5432 -v `pwd`/log:/home/www-data/log -v `pwd`/config:/home/www-data/config -e USER_UID=`id -u` -e USER_GID=`id -g` -e ADMIN_PSWD=pswd -d acdhch/arche
-    - name: composer update
-      run: |
-        composer update
     - name: wait
       run: |
         while [ "`grep '# INIT SCRIPTS ENDED' log/initScripts.log | wc -l`" != "1" ]; do

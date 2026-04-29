@@ -62,6 +62,7 @@ class ImportOntologyTest extends \PHPUnit\Framework\TestCase {
             'http://127.0.0.1/api'
         ];
         require __DIR__ . '/../bin/arche-import-ontology';
+        /** @phpstan-ignore method.alreadyNarrowedType */
         $this->assertTrue(true);
     }
 

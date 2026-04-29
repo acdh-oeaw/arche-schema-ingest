@@ -53,7 +53,9 @@ class Entity {
     }
 
     public function getId(): NamedNodeInterface {
-        return $this->res->getNode();
+        /** @var NamedNodeInterface $node */
+        $node = $this->res->getNode();
+        return $node;
     }
 
     /**
