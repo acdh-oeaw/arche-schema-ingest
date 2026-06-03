@@ -89,7 +89,7 @@ class Metadata {
         $repoPath = implode('/', array_slice($repoPath, count($repoPath) - 2));
         $client   = ProxyClient::factory(['http_errors' => false]);
         $headers  = ['Accept' => 'application/json'];
-        $resp     = $client->send(new Request('get', "https://api.github.com/repos/$repoPath/releases/tags/$version", $headers));
+        $resp     = $client->send(new Request('GET', "https://api.github.com/repos/$repoPath/releases/tags/$version", $headers));
         if ($resp->getStatusCode() === 200) {
             $data = json_decode($resp->getBody());
             $meta->add([
